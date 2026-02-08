@@ -1,0 +1,277 @@
+/* panel.css — Side panel styles for the Doc Change Logger */
+
+:root {
+  --bg: #1e1e2e;
+  --bg-surface: #252536;
+  --bg-hover: #2e2e42;
+  --text: #cdd6f4;
+  --text-muted: #6c7086;
+  --accent: #89b4fa;
+  --green: #a6e3a1;
+  --red: #f38ba8;
+  --yellow: #f9e2af;
+  --peach: #fab387;
+  --border: #313244;
+  --font-mono: "Fira Code", "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+
+/* --- Header & Toolbar --- */
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.toolbar button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbar button:hover {
+  background: var(--bg-hover);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin-left: auto;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.toggle input { accent-color: var(--accent); }
+
+/* --- Sections --- */
+
+section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+section h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.page-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  word-break: break-all;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* --- Outline Tree --- */
+
+.outline-tree {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.outline-tree ul {
+  list-style: none;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+  margin-left: 4px;
+}
+
+.outline-tree li {
+  padding: 1px 0;
+}
+
+.tree-label {
+  color: var(--accent);
+}
+
+/* --- Change History --- */
+
+#log-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+details {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+details[open] {
+  border-color: var(--accent);
+}
+
+summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  list-style: revert;
+}
+
+summary:hover {
+  background: var(--bg-hover);
+}
+
+summary time {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.change-count {
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+.entry-body {
+  padding: 6px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* --- Individual Change --- */
+
+.change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.kind-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.kind-badge.added    { background: var(--green); color: var(--bg); }
+.kind-badge.removed  { background: var(--red);   color: var(--bg); }
+.kind-badge.attribute { background: var(--yellow); color: var(--bg); }
+.kind-badge.text     { background: var(--peach);  color: var(--bg); }
+
+.target {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.node-desc {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.removed-text {
+  color: var(--red);
+  text-decoration: line-through;
+}
+
+.attr-name {
+  font-family: var(--font-mono);
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+del {
+  color: var(--red);
+  text-decoration: line-through;
+  font-size: 11px;
+}
+
+ins {
+  color: var(--green);
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.html-preview {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}

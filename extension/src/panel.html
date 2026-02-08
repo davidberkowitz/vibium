@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Change Logger</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <h1>Doc Change Logger</h1>
+    <div class="toolbar">
+      <button id="btn-refresh" title="Request fresh snapshot">Refresh</button>
+      <button id="btn-clear" title="Clear change history">Clear</button>
+      <label class="toggle">
+        <input type="checkbox" id="chk-pause">
+        <span>Pause</span>
+      </label>
+    </div>
+  </header>
+
+  <section id="current-state">
+    <h2>Current Document Structure</h2>
+    <div id="outline-tree" class="outline-tree">
+      <em class="muted">Waiting for page data&hellip;</em>
+    </div>
+    <div id="page-meta" class="page-meta"></div>
+  </section>
+
+  <section id="change-log">
+    <h2>Change History <span id="change-count" class="badge">0</span></h2>
+    <div id="log-entries">
+      <em class="muted">No changes recorded yet.</em>
+    </div>
+  </section>
+
+  <script src="panel.js"></script>
+</body>
+</html>
