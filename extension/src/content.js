@@ -49,8 +49,7 @@
     if (root.nodeType !== Node.ELEMENT_NODE) return null;
 
     const tag = root.tagName.toLowerCase();
-    // Skip script/style/svg internals for readability.
-    if (["script", "style", "link", "noscript"].includes(tag)) return null;
+    if (["script", "style", "link", "noscript", "svg"].includes(tag)) return null;
 
     const entry = { tag: describeNode(root) };
     const kids = [];
@@ -81,8 +80,10 @@
     const records = pendingRecords;
     pendingRecords = [];
 
-    const changes = processRecords(records);
+    var changes = processRecords(records);
     if (changes.length === 0) return;
+    // Cap per-batch to avoid overwhelming the panel on heavy DOM churn.
+    if (changes.length > 200) changes = changes.slice(0, 200);
 
     const message = {
       type: "DOM_CHANGES",

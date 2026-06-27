@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "sidePanel",
-    "scripting"
+    "tabs",
+    "webNavigation"
   ],
   "side_panel": {
     "default_path": "src/panel.html"

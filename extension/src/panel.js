@@ -52,7 +52,9 @@ function renderSnapshot(msg) {
     return;
   }
   outlineTree.innerHTML = "";
-  outlineTree.appendChild(buildTree(msg.outline));
+  var ul = document.createElement("ul");
+  ul.appendChild(buildTree(msg.outline));
+  outlineTree.appendChild(ul);
 }
 
 function buildTree(node) {
@@ -203,4 +205,22 @@ btnClear.addEventListener("click", function () {
 
 chkPause.addEventListener("change", function () {
   paused = chkPause.checked;
+});
+
+// When the active tab changes, fetch logs for the newly active tab.
+chrome.tabs.onActivated.addListener(function () {
+  chrome.runtime.sendMessage({ type: "GET_LOGS" }, function (resp) {
+    if (!resp) return;
+    // Reset the log view for the new tab.
+    logEntries.innerHTML = '<em class="muted">No changes recorded yet.</em>';
+    entryCount = 0;
+    firstEntry = true;
+    changeCount.textContent = "0";
+    if (resp.snapshot) renderSnapshot(resp.snapshot);
+    if (resp.changes && resp.changes.length) {
+      for (var i = 0; i < resp.changes.length; i++) {
+        renderChangeEntry(resp.changes[i]);
+      }
+    }
+  });
 });

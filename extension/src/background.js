@@ -21,6 +21,14 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
   tabLogs.delete(tabId);
 });
 
+// Clear change history on navigation (new page = fresh log).
+chrome.webNavigation.onCommitted.addListener(function (details) {
+  if (details.frameId !== 0) return; // top-level frame only
+  var store = getTabStore(details.tabId);
+  store.snapshot = null;
+  store.changes = [];
+});
+
 // Route messages from content scripts.
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (!sender.tab) {
