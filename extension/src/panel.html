@@ -9,28 +9,31 @@
 <body>
   <header>
     <h1>Doc Change Logger</h1>
+    <p class="subtitle">Capture document changes during AI thinking</p>
     <div class="toolbar">
-      <button id="btn-refresh" title="Request fresh snapshot">Refresh</button>
-      <button id="btn-clear" title="Clear change history">Clear</button>
-      <label class="toggle">
-        <input type="checkbox" id="chk-pause">
-        <span>Pause</span>
-      </label>
+      <button id="btn-record" class="btn-record" title="Start recording">Record</button>
+      <button id="btn-clear" title="Clear all sessions">Clear</button>
     </div>
   </header>
+
+  <section id="recording-banner" class="recording-banner hidden">
+    <span class="recording-dot"></span>
+    <span>Recording&hellip;</span>
+    <span id="recording-timer" class="recording-timer">0:00</span>
+  </section>
 
   <section id="current-state">
     <h2>Current Document Structure</h2>
     <div id="outline-tree" class="outline-tree">
-      <em class="muted">Waiting for page data&hellip;</em>
+      <em class="muted">Click Record before prompting the AI.</em>
     </div>
     <div id="page-meta" class="page-meta"></div>
   </section>
 
-  <section id="change-log">
-    <h2>Change History <span id="change-count" class="badge">0</span></h2>
-    <div id="log-entries">
-      <em class="muted">No changes recorded yet.</em>
+  <section id="sessions-section">
+    <h2>Thinking Sessions <span id="session-count" class="badge">0</span></h2>
+    <div id="session-list">
+      <em class="muted">No sessions yet. Hit Record, then prompt the AI.</em>
     </div>
   </section>
 

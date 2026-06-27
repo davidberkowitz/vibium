@@ -1,89 +1,140 @@
-// background.js — Service worker that routes messages between content script and side panel.
+// background.js — Routes messages and manages thinking session state per tab.
 
 "use strict";
 
-// Open the side panel when the extension action icon is clicked.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-// Store recent logs per tab so the panel can hydrate when opened.
-const tabLogs = new Map(); // tabId -> { snapshot, changes[] }
-const MAX_LOG_ENTRIES = 500;
+// Per-tab state: { recording, sessions: [{ start, end, updates[], outline }] }
+var tabState = new Map();
+var MAX_SESSIONS = 50;
+var MAX_UPDATES_PER_SESSION = 500;
 
-function getTabStore(tabId) {
-  if (!tabLogs.has(tabId)) {
-    tabLogs.set(tabId, { snapshot: null, changes: [] });
+function getState(tabId) {
+  if (!tabState.has(tabId)) {
+    tabState.set(tabId, { recording: false, sessions: [] });
   }
-  return tabLogs.get(tabId);
+  return tabState.get(tabId);
 }
 
-// Clean up when tabs close.
+function currentSession(state) {
+  if (state.sessions.length === 0) return null;
+  var last = state.sessions[state.sessions.length - 1];
+  return last.end ? null : last;
+}
+
 chrome.tabs.onRemoved.addListener(function (tabId) {
-  tabLogs.delete(tabId);
+  tabState.delete(tabId);
 });
 
-// Clear change history on navigation (new page = fresh log).
 chrome.webNavigation.onCommitted.addListener(function (details) {
-  if (details.frameId !== 0) return; // top-level frame only
-  var store = getTabStore(details.tabId);
-  store.snapshot = null;
-  store.changes = [];
+  if (details.frameId !== 0) return;
+  var state = getState(details.tabId);
+  // End any active session on navigation.
+  var session = currentSession(state);
+  if (session) {
+    session.end = new Date().toISOString();
+    state.recording = false;
+  }
 });
 
-// Route messages from content scripts.
+// -----------------------------------------------------------------------
+// Message routing
+// -----------------------------------------------------------------------
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  // Messages from the panel (no sender.tab).
   if (!sender.tab) {
-    // Message from the panel — forward to content script.
-    if (message.type === "REQUEST_SNAPSHOT") {
+    if (message.type === "SET_RECORDING") {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, message);
-        }
+        if (!tabs[0]) return;
+        var tabId = tabs[0].id;
+        var state = getState(tabId);
+        state.recording = message.recording;
+        // Forward to content script.
+        chrome.tabs.sendMessage(tabId, message);
       });
       return;
     }
-    if (message.type === "GET_LOGS") {
+    if (message.type === "GET_STATE") {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) {
-          const store = getTabStore(tabs[0].id);
-          sendResponse({ snapshot: store.snapshot, changes: store.changes });
-        } else {
-          sendResponse({ snapshot: null, changes: [] });
+        if (!tabs[0]) {
+          sendResponse({ recording: false, sessions: [] });
+          return;
         }
-      });
-      return true; // async sendResponse
-    }
-    if (message.type === "CLEAR_LOGS") {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) {
-          const store = getTabStore(tabs[0].id);
-          store.changes = [];
-          sendResponse({ ok: true });
-        }
+        var state = getState(tabs[0].id);
+        sendResponse({ recording: state.recording, sessions: state.sessions });
       });
       return true;
+    }
+    if (message.type === "CLEAR_SESSIONS") {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (!tabs[0]) return;
+        var state = getState(tabs[0].id);
+        var wasRecording = state.recording;
+        state.sessions = [];
+        state.recording = false;
+        if (wasRecording) {
+          chrome.tabs.sendMessage(tabs[0].id, { type: "SET_RECORDING", recording: false });
+        }
+        sendResponse({ ok: true });
+      });
+      return true;
+    }
+    if (message.type === "REQUEST_SNAPSHOT") {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, message);
+      });
+      return;
     }
     return;
   }
 
-  const tabId = sender.tab.id;
-  const store = getTabStore(tabId);
+  // Messages from content scripts.
+  var tabId = sender.tab.id;
+  var state = getState(tabId);
 
-  if (message.type === "DOM_SNAPSHOT") {
-    store.snapshot = message;
-    // Broadcast to any open panel connections.
-    broadcastToPanel(message);
-  } else if (message.type === "DOM_CHANGES") {
-    store.changes.push(message);
-    if (store.changes.length > MAX_LOG_ENTRIES) {
-      store.changes = store.changes.slice(-MAX_LOG_ENTRIES);
+  if (message.type === "SESSION_START") {
+    var session = {
+      start: message.timestamp,
+      end: null,
+      url: message.url,
+      title: message.title,
+      outlineStart: message.outline,
+      outlineEnd: null,
+      updates: [],
+    };
+    state.sessions.push(session);
+    if (state.sessions.length > MAX_SESSIONS) {
+      state.sessions = state.sessions.slice(-MAX_SESSIONS);
     }
-    store.snapshot = { type: "DOM_SNAPSHOT", timestamp: message.timestamp, url: message.url, title: message.title, outline: message.outline };
+    broadcastToPanel(message);
+  } else if (message.type === "SESSION_END") {
+    var cur = currentSession(state);
+    if (cur) {
+      cur.end = message.timestamp;
+      cur.outlineEnd = message.outline;
+    }
+    broadcastToPanel(message);
+  } else if (message.type === "THINKING_UPDATE") {
+    var active = currentSession(state);
+    if (active) {
+      active.updates.push(message);
+      if (active.updates.length > MAX_UPDATES_PER_SESSION) {
+        active.updates = active.updates.slice(-MAX_UPDATES_PER_SESSION);
+      }
+      active.outlineEnd = message.outline;
+    }
+    broadcastToPanel(message);
+  } else if (message.type === "DOM_SNAPSHOT") {
     broadcastToPanel(message);
   }
 });
 
-// Panel communication via a long-lived port.
-const panelPorts = new Set();
+// -----------------------------------------------------------------------
+// Panel ports
+// -----------------------------------------------------------------------
+
+var panelPorts = new Set();
 
 chrome.runtime.onConnect.addListener(function (port) {
   if (port.name !== "panel") return;
@@ -94,7 +145,7 @@ chrome.runtime.onConnect.addListener(function (port) {
 });
 
 function broadcastToPanel(message) {
-  for (const port of panelPorts) {
+  for (var port of panelPorts) {
     try {
       port.postMessage(message);
     } catch (_) {

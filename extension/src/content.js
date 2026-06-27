@@ -1,40 +1,38 @@
-// content.js — Observes DOM mutations and sends structured change logs to the background worker.
+// content.js — Records document changes during AI "thinking" sessions.
 
 (function () {
   "use strict";
 
-  // Avoid double-injection.
   if (window.__docChangeLoggerActive) return;
   window.__docChangeLoggerActive = true;
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
+  let recording = false;
+  let textNodeHistory = new Map(); // node -> [snapshots]
 
-  /** Produce a short, human-readable selector-like label for a node. */
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
   function describeNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent.trim();
-      return `#text "${text.length > 60 ? text.slice(0, 60) + "…" : text}"`;
+      var text = node.textContent.trim();
+      return '#text "' + (text.length > 80 ? text.slice(0, 80) + "…" : text) + '"';
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return node.nodeName;
 
-    const el = node;
-    let label = el.tagName.toLowerCase();
-    if (el.id) label += `#${el.id}`;
-    if (el.classList.length) label += `.${[...el.classList].join(".")}`;
+    var el = node;
+    var label = el.tagName.toLowerCase();
+    if (el.id) label += "#" + el.id;
+    if (el.classList.length) label += "." + Array.from(el.classList).join(".");
 
-    // Include role if present (useful for AI-driven UIs).
-    const role = el.getAttribute("role");
-    if (role) label += `[role="${role}"]`;
-
+    var role = el.getAttribute("role");
+    if (role) label += '[role="' + role + '"]';
     return label;
   }
 
-  /** Build a compact path from the node to the document root. */
   function nodePath(node) {
-    const parts = [];
-    let cur = node;
+    var parts = [];
+    var cur = node;
     while (cur && cur !== document.documentElement) {
       parts.unshift(describeNode(cur));
       cur = cur.parentNode;
@@ -42,93 +40,134 @@
     return parts.join(" > ");
   }
 
-  /** Snapshot the current high-level document outline (tag tree to depth 4). */
+  function extractText(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    return node.innerText || node.textContent || "";
+  }
+
+  function truncate(str, len) {
+    if (!str) return str;
+    if (!len) len = 300;
+    return str.length > len ? str.slice(0, len) + "…" : str;
+  }
+
+  function isNoiseAttribute(name) {
+    // Class and style churn from animations/frameworks is noise for thinking capture.
+    return name === "class" || name === "style" || name.startsWith("data-radix")
+      || name === "aria-busy" || name === "tabindex";
+  }
+
+  function isIgnoredNode(node) {
+    if (node.nodeType === Node.COMMENT_NODE) return true;
+    if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return true;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      var tag = node.tagName.toLowerCase();
+      if (["script", "style", "link", "noscript", "svg", "meta"].includes(tag)) return true;
+    }
+    return false;
+  }
+
   function snapshotOutline(root, depth) {
     if (depth === undefined) depth = 0;
     if (depth > 4 || !root) return null;
     if (root.nodeType !== Node.ELEMENT_NODE) return null;
-
-    const tag = root.tagName.toLowerCase();
-    if (["script", "style", "link", "noscript", "svg"].includes(tag)) return null;
-
-    const entry = { tag: describeNode(root) };
-    const kids = [];
-    for (const child of root.children) {
-      const snap = snapshotOutline(child, depth + 1);
+    var tag = root.tagName.toLowerCase();
+    if (["script", "style", "link", "noscript", "svg", "meta"].includes(tag)) return null;
+    var entry = { tag: describeNode(root) };
+    var kids = [];
+    for (var i = 0; i < root.children.length; i++) {
+      var snap = snapshotOutline(root.children[i], depth + 1);
       if (snap) kids.push(snap);
     }
     if (kids.length) entry.children = kids;
     return entry;
   }
 
-  // ---------------------------------------------------------------------------
-  // Mutation batching
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Mutation processing — thinking-oriented
+  // -------------------------------------------------------------------------
 
-  let pendingRecords = [];
-  let flushTimer = null;
+  var pendingRecords = [];
+  var flushTimer = null;
 
   function scheduleBatchFlush() {
     if (flushTimer) return;
-    flushTimer = setTimeout(flushBatch, 300); // debounce 300ms
+    flushTimer = setTimeout(flushBatch, 250);
   }
 
   function flushBatch() {
     flushTimer = null;
-    if (pendingRecords.length === 0) return;
+    if (!recording || pendingRecords.length === 0) {
+      pendingRecords = [];
+      return;
+    }
 
-    const records = pendingRecords;
+    var records = pendingRecords;
     pendingRecords = [];
 
     var changes = processRecords(records);
     if (changes.length === 0) return;
-    // Cap per-batch to avoid overwhelming the panel on heavy DOM churn.
     if (changes.length > 200) changes = changes.slice(0, 200);
 
-    const message = {
-      type: "DOM_CHANGES",
-      timestamp: new Date().toISOString(),
-      url: location.href,
-      title: document.title,
-      changes: changes,
-      outline: snapshotOutline(document.documentElement),
-    };
-
     try {
-      chrome.runtime.sendMessage(message);
+      chrome.runtime.sendMessage({
+        type: "THINKING_UPDATE",
+        timestamp: new Date().toISOString(),
+        url: location.href,
+        title: document.title,
+        changes: changes,
+        outline: snapshotOutline(document.documentElement),
+      });
     } catch (_) {
-      // Extension context invalidated (e.g. reload). Silently stop.
       observer.disconnect();
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Record processing
-  // ---------------------------------------------------------------------------
-
   function processRecords(records) {
-    const changes = [];
+    var changes = [];
 
-    for (const rec of records) {
+    for (var i = 0; i < records.length; i++) {
+      var rec = records[i];
+
       if (rec.type === "childList") {
-        for (const node of rec.addedNodes) {
-          if (isIgnored(node)) continue;
+        for (var a = 0; a < rec.addedNodes.length; a++) {
+          var added = rec.addedNodes[a];
+          if (isIgnoredNode(added)) continue;
+          var text = truncate(extractText(added));
           changes.push({
             kind: "added",
             target: nodePath(rec.target),
-            node: describeNode(node),
-            html: summariseHTML(node),
+            node: describeNode(added),
+            text: text || null,
           });
         }
-        for (const node of rec.removedNodes) {
-          if (isIgnored(node)) continue;
+        for (var r = 0; r < rec.removedNodes.length; r++) {
+          var removed = rec.removedNodes[r];
+          if (isIgnoredNode(removed)) continue;
           changes.push({
             kind: "removed",
             target: nodePath(rec.target),
-            node: describeNode(node),
+            node: describeNode(removed),
+          });
+        }
+      } else if (rec.type === "characterData") {
+        // Coalesce repeated text updates on the same node — this is the
+        // streaming-token pattern where content builds up incrementally.
+        var path = nodePath(rec.target);
+        var newText = truncate(rec.target.textContent);
+        var oldText = truncate(rec.oldValue);
+        // Only log if actual content changed meaningfully.
+        if (newText !== oldText) {
+          changes.push({
+            kind: "text",
+            target: path,
+            oldValue: oldText,
+            newValue: newText,
           });
         }
       } else if (rec.type === "attributes") {
+        if (isNoiseAttribute(rec.attributeName)) continue;
         changes.push({
           kind: "attribute",
           target: nodePath(rec.target),
@@ -136,47 +175,40 @@
           oldValue: rec.oldValue,
           newValue: rec.target.getAttribute(rec.attributeName),
         });
-      } else if (rec.type === "characterData") {
-        changes.push({
-          kind: "text",
-          target: nodePath(rec.target),
-          oldValue: truncate(rec.oldValue),
-          newValue: truncate(rec.target.textContent),
-        });
       }
     }
 
-    return changes;
-  }
-
-  function isIgnored(node) {
-    if (node.nodeType === Node.COMMENT_NODE) return true;
-    if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return true;
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tag = node.tagName.toLowerCase();
-      if (["script", "style", "link", "noscript"].includes(tag)) return true;
+    // Deduplicate consecutive text changes on the same target — keep only the
+    // last value for each target path within this batch (the final state of
+    // a streaming burst matters more than every intermediate token).
+    var textByTarget = new Map();
+    var deduped = [];
+    for (var j = changes.length - 1; j >= 0; j--) {
+      var c = changes[j];
+      if (c.kind === "text") {
+        if (!textByTarget.has(c.target)) {
+          textByTarget.set(c.target, true);
+          deduped.unshift(c);
+        } else {
+          // Merge: use this earlier entry's oldValue with the later entry's newValue.
+          var later = deduped.find(function (d) { return d.kind === "text" && d.target === c.target; });
+          if (later && c.oldValue) later.oldValue = c.oldValue;
+        }
+      } else {
+        deduped.unshift(c);
+      }
     }
-    return false;
+
+    return deduped;
   }
 
-  function truncate(str) {
-    if (!str) return str;
-    return str.length > 200 ? str.slice(0, 200) + "…" : str;
-  }
+  // -------------------------------------------------------------------------
+  // Observer
+  // -------------------------------------------------------------------------
 
-  function summariseHTML(node) {
-    if (node.nodeType === Node.TEXT_NODE) return truncate(node.textContent);
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-    const html = node.outerHTML || "";
-    return truncate(html);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Observer setup
-  // ---------------------------------------------------------------------------
-
-  const observer = new MutationObserver(function (records) {
-    pendingRecords.push(...records);
+  var observer = new MutationObserver(function (records) {
+    if (!recording) return;
+    pendingRecords.push.apply(pendingRecords, records);
     scheduleBatchFlush();
   });
 
@@ -189,22 +221,48 @@
     characterDataOldValue: true,
   });
 
-  // Send an initial snapshot so the panel has something immediately.
-  try {
-    chrome.runtime.sendMessage({
-      type: "DOM_SNAPSHOT",
-      timestamp: new Date().toISOString(),
-      url: location.href,
-      title: document.title,
-      outline: snapshotOutline(document.documentElement),
-    });
-  } catch (_) {
-    // Ignore if background not ready yet.
-  }
+  // -------------------------------------------------------------------------
+  // Message handling
+  // -------------------------------------------------------------------------
 
-  // Listen for explicit snapshot requests from the panel.
   chrome.runtime.onMessage.addListener(function (msg) {
-    if (msg && msg.type === "REQUEST_SNAPSHOT") {
+    if (!msg) return;
+
+    if (msg.type === "SET_RECORDING") {
+      recording = msg.recording;
+      if (recording) {
+        // Starting a new session — send an initial snapshot.
+        pendingRecords = [];
+        textNodeHistory.clear();
+        try {
+          chrome.runtime.sendMessage({
+            type: "SESSION_START",
+            timestamp: new Date().toISOString(),
+            url: location.href,
+            title: document.title,
+            outline: snapshotOutline(document.documentElement),
+          });
+        } catch (_) {}
+      } else {
+        // Flush any remaining mutations before stopping.
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flushBatch();
+        try {
+          chrome.runtime.sendMessage({
+            type: "SESSION_END",
+            timestamp: new Date().toISOString(),
+            url: location.href,
+            title: document.title,
+            outline: snapshotOutline(document.documentElement),
+          });
+        } catch (_) {}
+      }
+    }
+
+    if (msg.type === "REQUEST_SNAPSHOT") {
       try {
         chrome.runtime.sendMessage({
           type: "DOM_SNAPSHOT",
