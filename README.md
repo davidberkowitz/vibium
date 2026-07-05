@@ -67,6 +67,7 @@ A single Go binary (~10MB) that does everything:
 - **MCP Server:** stdio interface for LLM agents
 - **Auto-Wait:** Polls for elements before interacting
 - **Screenshots:** Viewport capture as PNG
+- **Secrets Vault:** Encrypted local store for API keys (`clicker vault`)
 
 **Design goal:** The binary is invisible. JS developers just `npm install vibium` and it works.
 
@@ -158,6 +159,20 @@ No manual browser setup required.
 ```bash
 VIBIUM_SKIP_BROWSER_DOWNLOAD=1 npm install vibium
 ```
+
+**Secrets vault** — store API keys encrypted on disk instead of in dotfiles:
+
+```bash
+clicker vault init            # create the vault (choose a passphrase)
+clicker vault set openai      # value typed at a hidden prompt, never argv
+clicker vault list            # names only, values are never shown
+export OPENAI_API_KEY=$(clicker vault get openai)
+```
+
+Secrets are encrypted with AES-256-GCM (key derived from your passphrase via
+Argon2id) and stored in a user-only file in the platform config directory
+(`clicker vault path` shows where). Everything stays on your machine. For
+scripts, set `VIBIUM_VAULT_PASSPHRASE` to skip the prompt.
 
 ---
 

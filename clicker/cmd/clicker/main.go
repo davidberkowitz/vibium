@@ -768,6 +768,8 @@ The server provides browser automation tools:
 	mcpCmd.Flags().String("screenshot-dir", "", "Directory for saving screenshots (default: ~/Pictures/Vibium, use \"\" to disable)")
 	rootCmd.AddCommand(mcpCmd)
 
+	rootCmd.AddCommand(newVaultCmd())
+
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("Clicker v{{.Version}}\n")
 

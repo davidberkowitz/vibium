@@ -195,6 +195,62 @@ func GetPlatformString() string {
 	return getPlatformString()
 }
 
+// GetConfigDir returns the platform-specific config directory for Vibium.
+// Linux: ~/.config/vibium/
+// macOS: ~/Library/Application Support/vibium/
+// Windows: %APPDATA%\vibium\
+func GetConfigDir() (string, error) {
+	var baseDir string
+
+	switch runtime.GOOS {
+	case "linux":
+		if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+			baseDir = xdgConfig
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			baseDir = filepath.Join(home, ".config")
+		}
+	case "darwin":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		baseDir = filepath.Join(home, "Library", "Application Support")
+	case "windows":
+		if appData := os.Getenv("APPDATA"); appData != "" {
+			baseDir = appData
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			baseDir = filepath.Join(home, "AppData", "Roaming")
+		}
+	default:
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		baseDir = filepath.Join(home, ".config")
+	}
+
+	return filepath.Join(baseDir, "vibium"), nil
+}
+
+// GetVaultPath returns the path to the encrypted secrets vault.
+// The config directory is used (rather than cache) because the vault
+// must survive cache cleanup.
+func GetVaultPath() (string, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "vault.json"), nil
+}
+
 // GetScreenshotDir returns the platform-specific default directory for screenshots.
 // macOS: ~/Pictures/Vibium/
 // Linux: ~/Pictures/Vibium/
