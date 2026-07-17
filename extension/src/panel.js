@@ -46,7 +46,7 @@ chrome.runtime.sendMessage({ type: "GET_STATE" }, function (resp) {
   updateRecordButton();
   if (resp.sessions && resp.sessions.length) {
     for (var i = 0; i < resp.sessions.length; i++) {
-      hydrateSession(resp.sessions[i], i);
+      hydrateSession(resp.sessions[i], i, i === resp.sessions.length - 1);
     }
   }
 });
@@ -64,7 +64,7 @@ chrome.tabs.onActivated.addListener(function () {
     activeBodyEl = null;
     if (resp.sessions && resp.sessions.length) {
       for (var i = 0; i < resp.sessions.length; i++) {
-        hydrateSession(resp.sessions[i], i);
+        hydrateSession(resp.sessions[i], i, i === resp.sessions.length - 1);
       }
     }
   });
@@ -233,15 +233,15 @@ function onThinkingUpdate(msg) {
 // Hydrate from stored sessions (panel re-open)
 // ---------------------------------------------------------------------------
 
-function hydrateSession(session, idx) {
+function hydrateSession(session, idx, isLast) {
   ensureListReady();
   sessionIdx = idx + 1;
   sessionCount.textContent = sessionIdx;
 
   var details = document.createElement("details");
   details.className = "session";
-  // Only the last session (most recent) should be open.
-  details.open = !session.end;
+  // Most recent session stays open for review; older ones collapse.
+  details.open = isLast;
 
   var summary = document.createElement("summary");
   var statusText = session.end
