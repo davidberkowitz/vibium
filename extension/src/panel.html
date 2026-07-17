@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doc Change Logger</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <h1>Doc Change Logger</h1>
+    <p class="subtitle">Capture document changes during AI thinking</p>
+    <div class="toolbar">
+      <button id="btn-record" class="btn-record" title="Start recording">Record</button>
+      <button id="btn-clear" title="Clear all sessions">Clear</button>
+    </div>
+  </header>
+
+  <section id="recording-banner" class="recording-banner hidden">
+    <span class="recording-dot"></span>
+    <span>Recording&hellip;</span>
+    <span id="recording-timer" class="recording-timer">0:00</span>
+  </section>
+
+  <section id="current-state">
+    <h2>Current Document Structure</h2>
+    <div id="outline-tree" class="outline-tree">
+      <em class="muted">Click Record before prompting the AI.</em>
+    </div>
+    <div id="page-meta" class="page-meta"></div>
+  </section>
+
+  <section id="sessions-section">
+    <h2>Thinking Sessions <span id="session-count" class="badge">0</span></h2>
+    <div id="session-list">
+      <em class="muted">No sessions yet. Hit Record, then prompt the AI.</em>
+    </div>
+  </section>
+
+  <details id="debug-section" class="debug-section">
+    <summary>Diagnostics</summary>
+    <div class="debug-body">
+      <div class="debug-row">
+        <span class="debug-label">Content script</span>
+        <span id="dbg-content" class="debug-value status-unknown">checking&hellip;</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Target tab</span>
+        <span id="dbg-tab" class="debug-value">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Recording state</span>
+        <span id="dbg-recording" class="debug-value">idle</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Messages received</span>
+        <span id="dbg-msg-count" class="debug-value">0</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Last message</span>
+        <span id="dbg-last-msg" class="debug-value">--</span>
+      </div>
+      <button id="btn-ping" class="btn-debug" title="Ping the content script">Ping Content Script</button>
+      <h3 class="debug-log-title">Event Log</h3>
+      <div id="dbg-log" class="debug-log"></div>
+    </div>
+  </details>
+
+  <script src="panel.js"></script>
+</body>
+</html>
