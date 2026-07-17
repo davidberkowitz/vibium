@@ -108,6 +108,50 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       });
       return;
     }
+    if (message.type === "PING") {
+      findContentTab(function (tab) {
+        if (!tab) {
+          sendResponse({ ok: false, error: "No content tab found" });
+          return;
+        }
+        chrome.tabs.sendMessage(tab.id, { type: "PING" }, function (resp) {
+          if (chrome.runtime.lastError) {
+            sendResponse({
+              ok: false,
+              tabId: tab.id,
+              tabUrl: tab.url,
+              tabTitle: tab.title,
+              error: chrome.runtime.lastError.message,
+            });
+          } else {
+            sendResponse({
+              ok: true,
+              tabId: tab.id,
+              tabUrl: tab.url,
+              tabTitle: tab.title,
+              contentScript: resp,
+            });
+          }
+        });
+      });
+      return true;
+    }
+    if (message.type === "GET_TAB_INFO") {
+      findContentTab(function (tab) {
+        if (!tab) {
+          sendResponse({ found: false });
+          return;
+        }
+        sendResponse({
+          found: true,
+          tabId: tab.id,
+          url: tab.url,
+          title: tab.title,
+          active: tab.active,
+        });
+      });
+      return true;
+    }
     return;
   }
 

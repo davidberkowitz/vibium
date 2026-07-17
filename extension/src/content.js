@@ -225,8 +225,13 @@
   // Message handling
   // -------------------------------------------------------------------------
 
-  chrome.runtime.onMessage.addListener(function (msg) {
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (!msg) return;
+
+    if (msg.type === "PING") {
+      sendResponse({ alive: true, recording: recording, url: location.href });
+      return;
+    }
 
     if (msg.type === "SET_RECORDING") {
       recording = msg.recording;

@@ -37,6 +37,35 @@
     </div>
   </section>
 
+  <details id="debug-section" class="debug-section">
+    <summary>Diagnostics</summary>
+    <div class="debug-body">
+      <div class="debug-row">
+        <span class="debug-label">Content script</span>
+        <span id="dbg-content" class="debug-value status-unknown">checking&hellip;</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Target tab</span>
+        <span id="dbg-tab" class="debug-value">--</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Recording state</span>
+        <span id="dbg-recording" class="debug-value">idle</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Messages received</span>
+        <span id="dbg-msg-count" class="debug-value">0</span>
+      </div>
+      <div class="debug-row">
+        <span class="debug-label">Last message</span>
+        <span id="dbg-last-msg" class="debug-value">--</span>
+      </div>
+      <button id="btn-ping" class="btn-debug" title="Ping the content script">Ping Content Script</button>
+      <h3 class="debug-log-title">Event Log</h3>
+      <div id="dbg-log" class="debug-log"></div>
+    </div>
+  </details>
+
   <script src="panel.js"></script>
 </body>
 </html>

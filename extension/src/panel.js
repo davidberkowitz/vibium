@@ -11,11 +11,20 @@ var btnClear = document.getElementById("btn-clear");
 var recordingBanner = document.getElementById("recording-banner");
 var recordingTimer = document.getElementById("recording-timer");
 
+var dbgContent = document.getElementById("dbg-content");
+var dbgTab = document.getElementById("dbg-tab");
+var dbgRecording = document.getElementById("dbg-recording");
+var dbgMsgCount = document.getElementById("dbg-msg-count");
+var dbgLastMsg = document.getElementById("dbg-last-msg");
+var dbgLog = document.getElementById("dbg-log");
+var btnPing = document.getElementById("btn-ping");
+
 var recording = false;
 var sessionIdx = 0;
 var firstSession = true;
 var recordingStartTime = null;
 var timerInterval = null;
+var msgCounter = 0;
 
 // Currently-recording session element, kept open and appended to live.
 var activeSessionEl = null;
@@ -28,6 +37,8 @@ var activeBodyEl = null;
 var port = chrome.runtime.connect({ name: "panel" });
 
 port.onMessage.addListener(function (msg) {
+  dbgTrack(msg.type, msg);
+
   if (msg.type === "SESSION_START") {
     onSessionStart(msg);
   } else if (msg.type === "SESSION_END") {
@@ -78,6 +89,8 @@ btnRecord.addEventListener("click", function () {
   recording = !recording;
   chrome.runtime.sendMessage({ type: "SET_RECORDING", recording: recording });
   updateRecordButton();
+  dbgUpdateRecordingState();
+  dbgLogEntry("info", recording ? "Recording started" : "Recording stopped");
 });
 
 btnClear.addEventListener("click", function () {
@@ -439,3 +452,103 @@ function formatDuration(ms) {
   s = s % 60;
   return m + "m " + s + "s";
 }
+
+// ---------------------------------------------------------------------------
+// Diagnostics
+// ---------------------------------------------------------------------------
+
+function dbgTrack(type, msg) {
+  msgCounter++;
+  dbgMsgCount.textContent = msgCounter;
+  dbgLastMsg.textContent = type;
+  var changeCount = (msg && msg.changes) ? " (" + msg.changes.length + " changes)" : "";
+  dbgLogEntry("info", "Received " + type + changeCount);
+}
+
+function dbgLogEntry(level, text) {
+  var entry = document.createElement("div");
+  entry.className = "log-entry";
+  var now = new Date();
+  var time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  entry.innerHTML = '<span class="log-time">' + time + "</span>"
+    + '<span class="log-' + level + '">' + escapeHtml(text) + "</span>";
+  dbgLog.prepend(entry);
+  // Keep log manageable.
+  while (dbgLog.children.length > 100) {
+    dbgLog.removeChild(dbgLog.lastChild);
+  }
+}
+
+function escapeHtml(s) {
+  var div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function dbgUpdateRecordingState() {
+  dbgRecording.textContent = recording ? "RECORDING" : "idle";
+  dbgRecording.className = "debug-value " + (recording ? "status-error" : "");
+}
+
+// Ping: check content script connectivity and target tab.
+function dbgPing() {
+  dbgContent.textContent = "pinging...";
+  dbgContent.className = "debug-value status-unknown";
+  dbgLogEntry("info", "Pinging content script...");
+
+  chrome.runtime.sendMessage({ type: "PING" }, function (resp) {
+    if (chrome.runtime.lastError) {
+      dbgContent.textContent = "error: " + chrome.runtime.lastError.message;
+      dbgContent.className = "debug-value status-error";
+      dbgLogEntry("err", "Ping failed: " + chrome.runtime.lastError.message);
+      return;
+    }
+    if (!resp) {
+      dbgContent.textContent = "no response";
+      dbgContent.className = "debug-value status-error";
+      dbgLogEntry("err", "Ping: no response from background");
+      return;
+    }
+    if (!resp.ok) {
+      dbgContent.textContent = "not connected";
+      dbgContent.className = "debug-value status-error";
+      dbgTab.textContent = resp.tabUrl ? resp.tabUrl.slice(0, 60) : "--";
+      dbgLogEntry("err", "Content script not reachable: " + (resp.error || "unknown"));
+      if (resp.tabUrl) {
+        dbgLogEntry("info", "Target tab: " + resp.tabUrl);
+      }
+      return;
+    }
+    dbgContent.textContent = "connected";
+    dbgContent.className = "debug-value status-ok";
+    dbgTab.textContent = (resp.tabTitle || "").slice(0, 30) + " — " + (resp.tabUrl || "").slice(0, 50);
+    var cs = resp.contentScript;
+    dbgLogEntry("ok", "Content script alive, recording=" + (cs ? cs.recording : "?")
+      + ", url=" + (cs ? cs.url : "?").slice(0, 60));
+  });
+}
+
+// Auto-check tab info on load.
+function dbgCheckTab() {
+  chrome.runtime.sendMessage({ type: "GET_TAB_INFO" }, function (resp) {
+    if (chrome.runtime.lastError || !resp) {
+      dbgTab.textContent = "error";
+      return;
+    }
+    if (!resp.found) {
+      dbgTab.textContent = "no content tab found";
+      dbgContent.textContent = "no target tab";
+      dbgContent.className = "debug-value status-error";
+      dbgLogEntry("err", "No content tab found in current window");
+      return;
+    }
+    dbgTab.textContent = (resp.title || "").slice(0, 30) + " — " + (resp.url || "").slice(0, 50);
+    dbgLogEntry("info", "Target tab: [" + resp.tabId + "] " + (resp.url || "").slice(0, 60));
+  });
+}
+
+btnPing.addEventListener("click", dbgPing);
+
+// Run initial diagnostics.
+dbgCheckTab();
+dbgUpdateRecordingState();
