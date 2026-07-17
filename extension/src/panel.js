@@ -517,13 +517,15 @@ function dbgPing() {
       if (resp.tabUrl) {
         dbgLogEntry("info", "Target tab: " + resp.tabUrl);
       }
+      dbgLogEntry("info", "Try refreshing the AI chat tab (F5), then ping again");
       return;
     }
     dbgContent.textContent = "connected";
     dbgContent.className = "debug-value status-ok";
     dbgTab.textContent = (resp.tabTitle || "").slice(0, 30) + " — " + (resp.tabUrl || "").slice(0, 50);
     var cs = resp.contentScript;
-    dbgLogEntry("ok", "Content script alive, recording=" + (cs ? cs.recording : "?")
+    var extra = resp.injected ? " (auto-injected)" : "";
+    dbgLogEntry("ok", "Content script alive" + extra + ", recording=" + (cs ? cs.recording : "?")
       + ", url=" + (cs ? cs.url : "?").slice(0, 60));
   });
 }

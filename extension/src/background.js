@@ -4,6 +4,32 @@
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+// -----------------------------------------------------------------------
+// Auto-inject content script into already-open tabs on install/update.
+// Without this, tabs opened before the extension was loaded won't have
+// the content script and recording won't work until the user refreshes.
+// -----------------------------------------------------------------------
+
+function injectIntoTab(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ["src/content.js"],
+  }).catch(function () {
+    // Ignore errors (e.g. chrome:// pages, extension pages).
+  });
+}
+
+chrome.runtime.onInstalled.addListener(function () {
+  chrome.tabs.query({}, function (tabs) {
+    for (var i = 0; i < tabs.length; i++) {
+      var url = tabs[i].url || "";
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        injectIntoTab(tabs[i].id);
+      }
+    }
+  });
+});
+
 // Per-tab state: { recording, sessions: [{ start, end, updates[], outline }] }
 var tabState = new Map();
 var MAX_SESSIONS = 50;
@@ -73,7 +99,15 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         if (!tab) return;
         var state = getState(tab.id);
         state.recording = message.recording;
-        chrome.tabs.sendMessage(tab.id, message);
+        chrome.tabs.sendMessage(tab.id, message, function () {
+          if (chrome.runtime.lastError) {
+            // Content script missing — inject and retry.
+            injectIntoTab(tab.id);
+            setTimeout(function () {
+              chrome.tabs.sendMessage(tab.id, message);
+            }, 500);
+          }
+        });
       });
       return;
     }
@@ -116,13 +150,31 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         }
         chrome.tabs.sendMessage(tab.id, { type: "PING" }, function (resp) {
           if (chrome.runtime.lastError) {
-            sendResponse({
-              ok: false,
-              tabId: tab.id,
-              tabUrl: tab.url,
-              tabTitle: tab.title,
-              error: chrome.runtime.lastError.message,
-            });
+            // Content script not present — try injecting it now.
+            injectIntoTab(tab.id);
+            // Wait briefly for injection, then retry.
+            setTimeout(function () {
+              chrome.tabs.sendMessage(tab.id, { type: "PING" }, function (resp2) {
+                if (chrome.runtime.lastError) {
+                  sendResponse({
+                    ok: false,
+                    tabId: tab.id,
+                    tabUrl: tab.url,
+                    tabTitle: tab.title,
+                    error: "Injected but still unreachable: " + chrome.runtime.lastError.message,
+                  });
+                } else {
+                  sendResponse({
+                    ok: true,
+                    tabId: tab.id,
+                    tabUrl: tab.url,
+                    tabTitle: tab.title,
+                    contentScript: resp2,
+                    injected: true,
+                  });
+                }
+              });
+            }, 500);
           } else {
             sendResponse({
               ok: true,
