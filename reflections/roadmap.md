@@ -13,10 +13,11 @@ missing.** ~3,300 finished lines are stranded on branches no one has ever seen.
    First action: one sentence to any Claude session — "Merge the doc-change-logger and
    vault branches to main." You never touch git. (Or click "Merge" on a PR if one is open —
    no terminal involved.)
-2. **End the insurance-card limbo.**
+2. **End the insurance-card limbo. — DECIDED 2026-07-21: abandoned.**
    Receipt: one commit 2026-04-01, untouched 106 days, no evidence of use.
-   First action: install it on your phone this week, or say "archive the
-   insurance-card branch." Either outcome beats limbo. Ten minutes.
+   The work is recoverable at commit `05a0c81` if ever wanted. The remote branch
+   `claude/insurance-card-wallet-QQMPe` still needs one click to delete (session
+   git proxy blocks deletions): github.com/davidberkowitz/vibium/branches → trash icon.
 3. **Send one link to one person.**
    Receipt: interview 2026-07-16 — zero of three projects ever seen by anyone else.
    First action: pick the extension (it's your best work), have an agent package it, send
