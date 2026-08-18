@@ -4,9 +4,9 @@ A small visual mind map that draws the same tree two ways: a flat radial map,
 and a spatial one you can orbit around. No build step, no dependencies — it is
 plain HTML, CSS and five small scripts drawing on a canvas.
 
-| Flat view | Orbit view |
-|---|---|
-| ![2D radial layout](../../docs/images/mindmap-2d.png) | ![3D force layout](../../docs/images/mindmap-3d.png) |
+| Flat view | Mid-scrub | Orbit view |
+|---|---|---|
+| ![2D radial layout](../../docs/images/mindmap-2d.png) | ![44% between the two views](../../docs/images/mindmap-blend.png) | ![3D force layout](../../docs/images/mindmap-3d.png) |
 
 ## Run it
 
@@ -30,7 +30,10 @@ spatial one.
 
 Switching views is one animated number: screen positions are interpolated
 between the two projections, so the map lifts off the plane instead of cutting
-to a different picture. Both views share one renderer and one hit test.
+to a different picture. Both views share one renderer and one hit test. The
+slider between the 2D and 3D buttons scrubs that number by hand, so you can
+park the map at any mix — and keep editing it there, since dragging a node
+compensates for how much of its movement the current blend actually shows.
 
 Automatic layout leaves any node you have dragged where you put it. **Auto-layout**
 (`L`) releases those and re-runs both layouts from scratch.
@@ -45,6 +48,7 @@ Automatic layout leaves any node you have dragged where you put it. **Auto-layou
 | `Delete` | remove the node and its branch |
 | arrows | walk the tree |
 | `2` / `3` | flat / orbit view |
+| the slider between them | hold the map part-way between the two |
 | `L` / `F` | auto-layout / fit on screen |
 | `Ctrl+Z` | undo |
 | `?` | shortcuts panel |

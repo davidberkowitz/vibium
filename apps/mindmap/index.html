@@ -13,6 +13,9 @@
 
     <div class="modes" role="group" aria-label="View mode">
       <button id="mode-2d" class="mode active" data-mode="2d" title="Flat view (2)">2D</button>
+      <input id="scrub" type="range" min="0" max="1" step="0.01" value="0"
+             title="Hold the map anywhere between the two views"
+             aria-label="Blend between the flat and the orbit view">
       <button id="mode-3d" class="mode" data-mode="3d" title="Orbit view (3)">3D</button>
     </div>
 
@@ -56,6 +59,7 @@
       <dt>Delete</dt><dd>remove the node and everything under it</dd>
       <dt>Arrow keys</dt><dd>walk the tree (parent / child / siblings)</dd>
       <dt>2 / 3</dt><dd>switch between the flat and orbit view</dd>
+      <dt>slider</dt><dd>hold the map part-way between the two</dd>
       <dt>L</dt><dd>re-run the automatic layout</dd>
       <dt>F</dt><dd>fit the whole map on screen</dd>
       <dt>Ctrl+Z</dt><dd>undo</dd>

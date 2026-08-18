@@ -8,6 +8,7 @@
   var editor = document.getElementById('editor');
   var hint = document.getElementById('hint');
   var help = document.getElementById('help');
+  var scrub = document.getElementById('scrub');
   var fileInput = document.getElementById('file-input');
 
   var renderer = new global.Renderer(canvas);
@@ -80,7 +81,7 @@
       global.Layout.seed3d(app.map, { force: true });
     }
     app.energy = 1;
-    fit();
+    fitBoth();
     save();
   }
 
@@ -173,33 +174,61 @@
     app.mode = mode;
     app.tTarget = mode === '3d' ? 1 : 0;
     if (mode === '3d') app.energy = Math.max(app.energy, 0.6);
-    document.getElementById('mode-2d').classList.toggle('active', mode === '2d');
-    document.getElementById('mode-3d').classList.toggle('active', mode === '3d');
-    fit();
+    fit(mode);
   }
 
-  function fit() {
+  /* Park the blend wherever the scrub is, without animating toward an end.
+     Past halfway the map answers to the spatial controls. */
+  function setBlend(value) {
+    app.t = Math.max(0, Math.min(1, value));
+    app.tTarget = app.t;
+    app.mode = app.t >= 0.5 ? '3d' : '2d';
+    if (app.t > 0.01) app.energy = Math.max(app.energy, 0.45);
+  }
+
+  /* Neither end is lit while the map sits between the two views. */
+  function syncModeButtons() {
+    var flat = app.t <= 0.02;
+    var spatial = app.t >= 0.98;
+    if (modeFlat.classList.contains('active') !== flat) modeFlat.classList.toggle('active', flat);
+    if (modeSpatial.classList.contains('active') !== spatial) modeSpatial.classList.toggle('active', spatial);
+  }
+
+  function fit(space) {
+    if ((space || app.mode) === '3d') fitSpatial(); else fitFlat();
+  }
+
+  /* Both spaces are framed up front, so the scrub always lands on a view that
+     is already composed rather than one that jumps when it arrives. */
+  function fitBoth() {
+    fitFlat();
+    fitSpatial();
+  }
+
+  function fitFlat() {
     var w = renderer.width || canvas.clientWidth;
     var h = renderer.height || canvas.clientHeight;
-    if (app.mode === '2d') {
-      var b = global.Layout.bounds(app.map, 'p2');
-      var spanX = Math.max(240, b.max.x - b.min.x + 320);
-      var spanY = Math.max(240, b.max.y - b.min.y + 220);
-      cam2.x = (b.min.x + b.max.x) / 2;
-      cam2.y = (b.min.y + b.max.y) / 2;
-      cam2.zoom = Math.max(0.12, Math.min(1.6, Math.min(w / spanX, h / spanY)));
-    } else {
-      var b3 = global.Layout.bounds(app.map, 'p3');
-      var depth = 0;
-      app.map.all().forEach(function (n) { depth = Math.max(depth, app.map.depth(n.id)); });
-      // Frame the outermost shell, so the view does not jump while the force
-      // layout is still settling.
-      var radius = global.Layout.SHELL * Math.max(1, depth);
-      ['x', 'y', 'z'].forEach(function (axis) {
-        radius = Math.max(radius, Math.abs(b3.min[axis]), Math.abs(b3.max[axis]));
-      });
-      cam3.dist = Math.max(320, radius * 1.15 * cam3.focal / (0.45 * Math.min(w, h)));
-    }
+    var box = global.Layout.bounds(app.map, 'p2');
+    var spanX = Math.max(240, box.max.x - box.min.x + 320);
+    var spanY = Math.max(240, box.max.y - box.min.y + 220);
+    cam2.x = (box.min.x + box.max.x) / 2;
+    cam2.y = (box.min.y + box.max.y) / 2;
+    cam2.zoom = Math.max(0.12, Math.min(1.6, Math.min(w / spanX, h / spanY)));
+  }
+
+  function fitSpatial() {
+    var w = renderer.width || canvas.clientWidth;
+    var h = renderer.height || canvas.clientHeight;
+    var box = global.Layout.bounds(app.map, 'p3');
+    var depth = 0;
+    app.map.all().forEach(function (n) { depth = Math.max(depth, app.map.depth(n.id)); });
+    // Frame the outermost shell, so the view does not jump while the force
+    // layout is still settling.
+    var radius = global.Layout.SHELL * Math.max(1, depth);
+    ['x', 'y', 'z'].forEach(function (axis) {
+      radius = Math.max(radius, Math.abs(box.min[axis]), Math.abs(box.max[axis]));
+    });
+    cam3.dist = Math.max(320, radius * 1.15 * cam3.focal / (0.45 * Math.min(w, h)));
   }
 
   function screenPoint(event) {
@@ -259,6 +288,11 @@
     var node = app.map.get(drag.id);
     if (!node) return;
     node.pinned = true;
+    // Mid-blend only part of a node's movement reaches the screen, so scale the
+    // drag by that share to keep the card under the cursor.
+    var share = Math.max(0.25, app.mode === '3d' ? app.t : 1 - app.t);
+    dx /= share;
+    dy /= share;
     if (app.mode === '3d') {
       // Slide the node across the plane that faces the camera.
       var placement = renderer.placement(node.id);
@@ -420,7 +454,7 @@
     global.Layout.radial(app.map, { force: true });
     global.Layout.seed3d(app.map, { force: true });
     app.energy = 1;
-    fit();
+    fitBoth();
     save();
   }
 
@@ -487,8 +521,12 @@
     document.getElementById(id).addEventListener('click', handler);
   }
 
+  var modeFlat = document.getElementById('mode-2d');
+  var modeSpatial = document.getElementById('mode-3d');
+
   bind('mode-2d', function () { setMode('2d'); });
   bind('mode-3d', function () { setMode('3d'); });
+  scrub.addEventListener('input', function () { setBlend(parseFloat(scrub.value)); });
   bind('btn-child', function () {
     var node = addChild(app.selectedId, 'Idea');
     if (node) startEditing(node.id);
@@ -500,7 +538,7 @@
   bind('btn-rename', function () { startEditing(app.selectedId); });
   bind('btn-delete', removeSelected);
   bind('btn-layout', relayout);
-  bind('btn-fit', fit);
+  bind('btn-fit', function () { fit(); });
   bind('btn-undo', undo);
   bind('btn-help', function () { help.hidden = !help.hidden; });
   bind('btn-new', function () {
@@ -561,8 +599,13 @@
     });
 
     positionEditor();
+    scrub.value = app.t;
+    syncModeButtons();
+
+    var between = app.t > 0.02 && app.t < 0.98;
     hint.textContent = now < app.flashUntil ? app.flash
-      : app.map.nodes.size + ' nodes · ' +
+      : (between ? Math.round(app.t * 100) + '% spatial · ' : '') +
+        app.map.nodes.size + ' nodes · ' +
         (app.mode === '3d' ? 'drag to orbit, wheel to dolly' : 'drag to pan, wheel to zoom') +
         ' · press ? for shortcuts';
 
@@ -585,7 +628,7 @@
 
   global.addEventListener('resize', function () {
     renderer.resize();
-    fit();
+    fitBoth();
   });
 
   global.mindmapApp = app;   // handy for debugging and automated checks
