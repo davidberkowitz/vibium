@@ -1,4 +1,4 @@
-.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp double-tap help
+.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap mindmap double-tap help
 
 # Default target
 all: build
@@ -61,7 +61,7 @@ serve: build-go
 	./clicker/bin/clicker serve
 
 # Run all tests
-test: build test-cli test-js test-mcp
+test: build test-cli test-js test-mcp test-mindmap
 
 # Run CLI tests (tests the clicker binary directly)
 # Process tests run separately with --test-concurrency=1 to avoid interference
@@ -82,6 +82,16 @@ test-js: build
 test-mcp: build-go
 	@echo "━━━ MCP Server Tests ━━━"
 	node --test --test-concurrency=1 tests/mcp/server.test.js
+
+# Run mind map tests (pure logic, no browser or build needed)
+test-mindmap:
+	@echo "━━━ Mind Map Tests ━━━"
+	node --test tests/mindmap/model.test.js
+
+# Serve the mind map app on http://localhost:8080
+mindmap:
+	@echo "Mind map: http://localhost:8080"
+	cd apps/mindmap && python3 -m http.server 8080
 
 # Kill zombie Chrome and chromedriver processes
 double-tap:
@@ -132,6 +142,8 @@ help:
 	@echo "  make test-cli           - Run CLI tests only"
 	@echo "  make test-js            - Run JS library tests only"
 	@echo "  make test-mcp           - Run MCP server tests only"
+	@echo "  make test-mindmap       - Run mind map tests only"
+	@echo "  make mindmap            - Serve the mind map app on :8080"
 	@echo "  make double-tap         - Kill zombie Chrome/chromedriver processes"
 	@echo "  make clean              - Clean binaries and JS dist"
 	@echo "  make clean-packages     - Clean built packages"
