@@ -54,7 +54,10 @@ Drag a node to move it (in 3D it slides along the plane facing you), hold
 background to pan or orbit, and double-click empty space to add a node there.
 
 The map is saved to `localStorage` as you work. **JSON** and **PNG** export the
-map and the current view; **Import** reads a previously exported `.json`.
+map and the current view; **Import** reads a previously exported `.json`. In a
+normal browser the exports save through a link; when the page is embedded
+somewhere that withholds download permission (a published claude.ai artifact,
+say) it hands the file to the host instead, which asks the reader first.
 
 ## Files
 

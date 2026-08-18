@@ -25,7 +25,9 @@
     drag: null,
     editingId: null,
     undo: [],
-    lastTime: 0
+    lastTime: 0,
+    flash: '',
+    flashUntil: 0
   };
 
   /* ---------- persistence ---------- */
@@ -422,7 +424,7 @@
     save();
   }
 
-  function download(blob, name) {
+  function linkSave(blob, name) {
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
     link.href = url;
@@ -431,6 +433,33 @@
     link.click();
     link.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  /* Ordinary browsers save through a link. Published as a claude.ai artifact
+     the page has no download permission of its own, so the file goes through
+     the host, which asks the reader before writing anything. */
+  function download(blob, name) {
+    if (!global.claude || typeof global.claude.use !== 'function') {
+      linkSave(blob, name);
+      return;
+    }
+    global.claude.use('downloads').then(function (downloads) {
+      if (!downloads) {
+        flash('Saving files is not available here.');
+        return;
+      }
+      return downloads.save({ filename: name, data: blob }).then(function () {
+        flash('Saved ' + name);
+      }, function (error) {
+        if (!error || error.code !== 'declined') flash('Could not save ' + name + '.');
+      });
+    });
+  }
+
+  /* A short-lived message in place of the status line. */
+  function flash(message) {
+    app.flash = message;
+    app.flashUntil = (global.performance ? performance.now() : 0) + 4000;
   }
 
   function fileName(extension) {
@@ -532,9 +561,10 @@
     });
 
     positionEditor();
-    hint.textContent = app.map.nodes.size + ' nodes · ' +
-      (app.mode === '3d' ? 'drag to orbit, wheel to dolly' : 'drag to pan, wheel to zoom') +
-      ' · press ? for shortcuts';
+    hint.textContent = now < app.flashUntil ? app.flash
+      : app.map.nodes.size + ' nodes · ' +
+        (app.mode === '3d' ? 'drag to orbit, wheel to dolly' : 'drag to pan, wheel to zoom') +
+        ' · press ? for shortcuts';
 
     requestAnimationFrame(tick);
   }
