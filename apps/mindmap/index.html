@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mind Map — 2D / 3D</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 16 26 8 M16 16 26 24 M16 16 6 16' stroke='%2358a6ff' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%2358a6ff'/%3E%3Ccircle cx='26' cy='8' r='3.5' fill='%23f778ba'/%3E%3Ccircle cx='26' cy='24' r='3.5' fill='%237ee787'/%3E%3Ccircle cx='6' cy='16' r='3.5' fill='%23ffa657'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="brand">Mind&nbsp;Map</span>
+
+    <div class="modes" role="group" aria-label="View mode">
+      <button id="mode-2d" class="mode active" data-mode="2d" title="Flat view (2)">2D</button>
+      <input id="scrub" type="range" min="0" max="1" step="0.01" value="0"
+             title="Hold the map anywhere between the two views"
+             aria-label="Blend between the flat and the orbit view">
+      <button id="mode-3d" class="mode" data-mode="3d" title="Orbit view (3)">3D</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <button id="btn-child" title="Add child of selection (Tab)">+ Child</button>
+    <button id="btn-sibling" title="Add sibling of selection (Enter)">+ Sibling</button>
+    <button id="btn-rename" title="Rename selection (F2 / double-click)">Rename</button>
+    <button id="btn-delete" title="Delete selection and its branch (Delete)">Delete</button>
+
+    <div class="sep"></div>
+
+    <button id="btn-layout" title="Re-run automatic layout (L)">Auto-layout</button>
+    <button id="btn-fit" title="Fit map to screen (F)">Fit</button>
+    <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+
+    <div class="sep"></div>
+
+    <button id="btn-new" title="Start a new map">New</button>
+    <button id="btn-import" title="Load a map from a .json file">Import</button>
+    <button id="btn-json" title="Save the map as .json">JSON</button>
+    <button id="btn-png" title="Save the current view as .png">PNG</button>
+
+    <div class="spacer"></div>
+    <button id="btn-help" class="ghost" title="Keyboard shortcuts (?)">?</button>
+    <input type="file" id="file-input" accept="application/json,.json" hidden>
+  </header>
+
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+    <input id="editor" type="text" spellcheck="false" hidden>
+    <div id="hint"></div>
+  </main>
+
+  <aside id="help" hidden>
+    <h2>Shortcuts</h2>
+    <dl>
+      <dt>Tab</dt><dd>new child of the selected node</dd>
+      <dt>Enter</dt><dd>new sibling of the selected node</dd>
+      <dt>F2 / double-click</dt><dd>rename a node</dd>
+      <dt>Delete</dt><dd>remove the node and everything under it</dd>
+      <dt>Arrow keys</dt><dd>walk the tree (parent / child / siblings)</dd>
+      <dt>2 / 3</dt><dd>switch between the flat and orbit view</dd>
+      <dt>slider</dt><dd>hold the map part-way between the two</dd>
+      <dt>L</dt><dd>re-run the automatic layout</dd>
+      <dt>F</dt><dd>fit the whole map on screen</dd>
+      <dt>Ctrl+Z</dt><dd>undo</dd>
+      <dt>?</dt><dd>show or hide this panel</dd>
+    </dl>
+    <h2>Mouse</h2>
+    <dl>
+      <dt>Drag a node</dt><dd>move it (in 3D it slides on the screen plane)</dd>
+      <dt>Shift + drag onto a node</dt><dd>re-parent the dragged branch</dd>
+      <dt>Drag the background</dt><dd>pan in 2D, orbit in 3D</dd>
+      <dt>Wheel</dt><dd>zoom in 2D, dolly in 3D</dd>
+      <dt>Double-click the background</dt><dd>add a node there</dd>
+    </dl>
+    <p class="note">The map is saved in this browser automatically.</p>
+  </aside>
+
+  <script src="js/model.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
