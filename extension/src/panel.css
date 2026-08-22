@@ -349,3 +349,93 @@ details.update-group > summary time {
 
 del { color: var(--red); text-decoration: line-through; font-size: 11px; }
 ins { color: var(--green); text-decoration: none; font-size: 11px; }
+
+/* --- Diagnostics section --- */
+
+.debug-section {
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.debug-section > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  list-style: revert;
+  user-select: none;
+}
+
+.debug-section > summary:hover { background: var(--bg-hover); }
+
+.debug-body {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.debug-label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.debug-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.status-ok { color: var(--green); }
+.status-error { color: var(--red); }
+.status-unknown { color: var(--yellow); }
+
+.btn-debug {
+  margin-top: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  width: 100%;
+}
+
+.btn-debug:hover { background: var(--bg-hover); }
+
+.debug-log-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.debug-log {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.debug-log .log-entry { border-bottom: 1px solid var(--border); padding: 2px 0; }
+.debug-log .log-entry:last-child { border-bottom: none; }
+.log-time { color: var(--text-muted); margin-right: 6px; }
+.log-ok { color: var(--green); }
+.log-err { color: var(--red); }
+.log-info { color: var(--accent); }

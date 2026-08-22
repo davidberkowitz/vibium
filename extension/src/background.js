@@ -4,6 +4,32 @@
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+// -----------------------------------------------------------------------
+// Auto-inject content script into already-open tabs on install/update.
+// Without this, tabs opened before the extension was loaded won't have
+// the content script and recording won't work until the user refreshes.
+// -----------------------------------------------------------------------
+
+function injectIntoTab(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ["src/content.js"],
+  }).catch(function () {
+    // Ignore errors (e.g. chrome:// pages, extension pages).
+  });
+}
+
+chrome.runtime.onInstalled.addListener(function () {
+  chrome.tabs.query({}, function (tabs) {
+    for (var i = 0; i < tabs.length; i++) {
+      var url = tabs[i].url || "";
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        injectIntoTab(tabs[i].id);
+      }
+    }
+  });
+});
+
 // Per-tab state: { recording, sessions: [{ start, end, updates[], outline }] }
 var tabState = new Map();
 var MAX_SESSIONS = 50;
@@ -29,7 +55,6 @@ chrome.tabs.onRemoved.addListener(function (tabId) {
 chrome.webNavigation.onCommitted.addListener(function (details) {
   if (details.frameId !== 0) return;
   var state = getState(details.tabId);
-  // End any active session on navigation.
   var session = currentSession(state);
   if (session) {
     session.end = new Date().toISOString();
@@ -38,53 +63,146 @@ chrome.webNavigation.onCommitted.addListener(function (details) {
 });
 
 // -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+// Find the target content tab — the non-extension tab the user is working in.
+// Works whether the panel is a real side panel or opened as a standalone tab.
+function findContentTab(cb) {
+  chrome.tabs.query({ currentWindow: true }, function (allTabs) {
+    // Prefer the active non-extension tab.
+    var best = null;
+    for (var i = 0; i < allTabs.length; i++) {
+      var t = allTabs[i];
+      if (t.url && t.url.startsWith("chrome-extension://")) continue;
+      if (t.url && t.url.startsWith("chrome://")) continue;
+      if (!best || t.active) best = t;
+    }
+    cb(best);
+  });
+}
+
+// -----------------------------------------------------------------------
 // Message routing
 // -----------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  // Messages from the panel (no sender.tab).
-  if (!sender.tab) {
+  // Distinguish panel/extension-page messages from content-script messages.
+  // When the panel is opened as a tab (not a side panel), sender.tab exists
+  // but the URL is chrome-extension://.
+  var fromExtensionPage = !sender.tab
+    || (sender.url && sender.url.startsWith("chrome-extension://"));
+
+  if (fromExtensionPage) {
     if (message.type === "SET_RECORDING") {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (!tabs[0]) return;
-        var tabId = tabs[0].id;
-        var state = getState(tabId);
+      findContentTab(function (tab) {
+        if (!tab) return;
+        var state = getState(tab.id);
         state.recording = message.recording;
-        // Forward to content script.
-        chrome.tabs.sendMessage(tabId, message);
+        chrome.tabs.sendMessage(tab.id, message, function () {
+          if (chrome.runtime.lastError) {
+            // Content script missing — inject and retry.
+            injectIntoTab(tab.id);
+            setTimeout(function () {
+              chrome.tabs.sendMessage(tab.id, message);
+            }, 500);
+          }
+        });
       });
       return;
     }
     if (message.type === "GET_STATE") {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (!tabs[0]) {
+      findContentTab(function (tab) {
+        if (!tab) {
           sendResponse({ recording: false, sessions: [] });
           return;
         }
-        var state = getState(tabs[0].id);
+        var state = getState(tab.id);
         sendResponse({ recording: state.recording, sessions: state.sessions });
       });
       return true;
     }
     if (message.type === "CLEAR_SESSIONS") {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (!tabs[0]) return;
-        var state = getState(tabs[0].id);
+      findContentTab(function (tab) {
+        if (!tab) return;
+        var state = getState(tab.id);
         var wasRecording = state.recording;
         state.sessions = [];
         state.recording = false;
         if (wasRecording) {
-          chrome.tabs.sendMessage(tabs[0].id, { type: "SET_RECORDING", recording: false });
+          chrome.tabs.sendMessage(tab.id, { type: "SET_RECORDING", recording: false });
         }
         sendResponse({ ok: true });
       });
       return true;
     }
     if (message.type === "REQUEST_SNAPSHOT") {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, message);
+      findContentTab(function (tab) {
+        if (tab) chrome.tabs.sendMessage(tab.id, message);
       });
       return;
+    }
+    if (message.type === "PING") {
+      findContentTab(function (tab) {
+        if (!tab) {
+          sendResponse({ ok: false, error: "No content tab found" });
+          return;
+        }
+        chrome.tabs.sendMessage(tab.id, { type: "PING" }, function (resp) {
+          if (chrome.runtime.lastError) {
+            // Content script not present — try injecting it now.
+            injectIntoTab(tab.id);
+            // Wait briefly for injection, then retry.
+            setTimeout(function () {
+              chrome.tabs.sendMessage(tab.id, { type: "PING" }, function (resp2) {
+                if (chrome.runtime.lastError) {
+                  sendResponse({
+                    ok: false,
+                    tabId: tab.id,
+                    tabUrl: tab.url,
+                    tabTitle: tab.title,
+                    error: "Injected but still unreachable: " + chrome.runtime.lastError.message,
+                  });
+                } else {
+                  sendResponse({
+                    ok: true,
+                    tabId: tab.id,
+                    tabUrl: tab.url,
+                    tabTitle: tab.title,
+                    contentScript: resp2,
+                    injected: true,
+                  });
+                }
+              });
+            }, 500);
+          } else {
+            sendResponse({
+              ok: true,
+              tabId: tab.id,
+              tabUrl: tab.url,
+              tabTitle: tab.title,
+              contentScript: resp,
+            });
+          }
+        });
+      });
+      return true;
+    }
+    if (message.type === "GET_TAB_INFO") {
+      findContentTab(function (tab) {
+        if (!tab) {
+          sendResponse({ found: false });
+          return;
+        }
+        sendResponse({
+          found: true,
+          tabId: tab.id,
+          url: tab.url,
+          title: tab.title,
+          active: tab.active,
+        });
+      });
+      return true;
     }
     return;
   }

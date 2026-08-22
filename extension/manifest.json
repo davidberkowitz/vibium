@@ -7,7 +7,8 @@
     "activeTab",
     "sidePanel",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "scripting"
   ],
   "side_panel": {
     "default_path": "src/panel.html"
