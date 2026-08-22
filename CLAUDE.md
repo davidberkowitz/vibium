@@ -41,3 +41,15 @@ Power users can override defaults (headless mode, custom paths, etc.) when neede
   - Have a human verify the milestone is complete.
   - Git commit the changes
 - When adding new command line options to the bin/clicker binary, be sure to add a simple example and sample output (or short description)
+
+## Session Rules (this fork)
+
+- The agent owns ALL git mechanics — commits, merges, pushes, branch cleanup.
+  The user never needs to run a git command.
+- Last ten minutes rule: before any session ends, ask exactly one question about
+  the work built this session: "ship or archive?" There is no third option.
+  Ship = merge to main, push, print install/run instructions. Archive = tag
+  `archive/<name>-<date>`, delete branch. Never end a session with work in limbo.
+- After anything ships, ask: "Who gets the link?" and draft the one-line message.
+- Finished means used: offer to install/run the artifact and show proof
+  (screenshots or transcripts) before calling a project done.
