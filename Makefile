@@ -1,4 +1,4 @@
-.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap mindmap double-tap help
+.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap test-gridprobe mindmap gridprobe double-tap help
 
 # Default target
 all: build
@@ -61,7 +61,7 @@ serve: build-go
 	./clicker/bin/clicker serve
 
 # Run all tests
-test: build test-cli test-js test-mcp test-mindmap
+test: build test-cli test-js test-mcp test-mindmap test-gridprobe
 
 # Run CLI tests (tests the clicker binary directly)
 # Process tests run separately with --test-concurrency=1 to avoid interference
@@ -88,10 +88,20 @@ test-mindmap:
 	@echo "━━━ Mind Map Tests ━━━"
 	node --test tests/mindmap/model.test.js
 
+# Run grid probe tests (pure logic, no browser or build needed)
+test-gridprobe:
+	@echo "━━━ Grid Probe Tests ━━━"
+	node --test tests/gridprobe/probe.test.js
+
 # Serve the mind map app on http://localhost:8080
 mindmap:
 	@echo "Mind map: http://localhost:8080"
 	cd apps/mindmap && python3 -m http.server 8080
+
+# Serve the grid probe app on http://localhost:8081
+gridprobe:
+	@echo "Grid probe: http://localhost:8081"
+	cd apps/gridprobe && python3 -m http.server 8081
 
 # Kill zombie Chrome and chromedriver processes
 double-tap:
@@ -143,7 +153,9 @@ help:
 	@echo "  make test-js            - Run JS library tests only"
 	@echo "  make test-mcp           - Run MCP server tests only"
 	@echo "  make test-mindmap       - Run mind map tests only"
+	@echo "  make test-gridprobe     - Run grid probe tests only"
 	@echo "  make mindmap            - Serve the mind map app on :8080"
+	@echo "  make gridprobe          - Serve the grid probe app on :8081"
 	@echo "  make double-tap         - Kill zombie Chrome/chromedriver processes"
 	@echo "  make clean              - Clean binaries and JS dist"
 	@echo "  make clean-packages     - Clean built packages"

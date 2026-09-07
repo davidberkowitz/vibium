@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid Probe — rotating grid, blind spots</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg stroke='%2358a6ff' stroke-width='1.6' fill='none' transform='rotate(18 16 16)'%3E%3Cpath d='M4 10h24M4 16h24M4 22h24M10 4v24M16 4v24M22 4v24'/%3E%3C/g%3E%3Ccircle cx='21' cy='11' r='4.5' fill='%23f2716b' opacity='.85'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="brand">Grid&nbsp;Probe</span>
+
+    <div class="forms" role="group" aria-label="Grid form">
+      <button class="form active" data-form="square" title="Square grid (1)">Square</button>
+      <button class="form" data-form="triangular" title="Triangular grid (2)">Triangular</button>
+      <button class="form" data-form="polar" title="Rings and spokes (3)">Polar</button>
+      <button class="form" data-form="moire" title="Two counter-rotating grids (4)">Moiré</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <button id="btn-play" title="Pause / resume rotation (Space)">Pause</button>
+    <button id="btn-blind" title="Show the blind-spot map (B)">Blind spots</button>
+    <button id="btn-reset" title="Back to defaults (R)">Reset</button>
+
+    <div class="sep"></div>
+
+    <button id="btn-image" title="Use a screenshot or photo as the backdrop">Backdrop…</button>
+    <button id="btn-png" title="Save the current frame as .png">PNG</button>
+
+    <div class="spacer"></div>
+    <span id="readout" class="readout"></span>
+    <button id="btn-panel" class="ghost" title="Hide the controls (H)">‹</button>
+    <input type="file" id="file-input" accept="image/*" hidden>
+  </header>
+
+  <main id="stage">
+    <canvas id="canvas"></canvas>
+
+    <aside id="panel">
+      <section>
+        <h2>Motion</h2>
+        <label>Speed <output id="v-speed"></output>
+          <input id="speed" type="range" min="-90" max="90" step="0.5" value="6">
+        </label>
+        <p class="note">Degrees per second. Negative turns the other way; zero freezes the grid where it stands.</p>
+      </section>
+
+      <section>
+        <h2>Grid</h2>
+        <label>Line width <output id="v-width"></output>
+          <input id="width" type="range" min="0.25" max="8" step="0.25" value="1">
+        </label>
+        <label>Opacity <output id="v-opacity"></output>
+          <input id="opacity" type="range" min="0.05" max="1" step="0.05" value="0.55">
+        </label>
+        <label>Pitch <output id="v-pitch"></output>
+          <input id="pitch" type="range" min="8" max="200" step="2" value="48">
+        </label>
+        <label id="row-spokes" hidden>Spokes <output id="v-spokes"></output>
+          <input id="spokes" type="range" min="3" max="36" step="1" value="12">
+        </label>
+        <label class="inline">Colour
+          <input id="colour" type="color" value="#7fe3ff">
+        </label>
+        <label class="inline">Backdrop
+          <select id="backdrop">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="grey">Mid grey</option>
+            <option value="checker">Checker</option>
+            <option value="image">Image…</option>
+          </select>
+        </label>
+        <p class="note" id="form-note"></p>
+      </section>
+
+      <section>
+        <h2>Distortion</h2>
+        <label>k1 <output id="v-k1"></output>
+          <input id="k1" type="range" min="-0.6" max="0.6" step="0.01" value="0">
+        </label>
+        <label>k2 <output id="v-k2"></output>
+          <input id="k2" type="range" min="-0.4" max="0.4" step="0.01" value="0">
+        </label>
+        <label>Optical centre X <output id="v-ox"></output>
+          <input id="ox" type="range" min="-40" max="40" step="1" value="0">
+        </label>
+        <label>Optical centre Y <output id="v-oy"></output>
+          <input id="oy" type="range" min="-40" max="40" step="1" value="0">
+        </label>
+        <p class="note">k1 below zero is barrel, above is pincushion; radii are normalised so 1.0 is the corner of the frame. Leave both at zero to lay a clean grid over a distorted image — then dial them until the lines look straight again, and you have measured the distortion.</p>
+      </section>
+
+      <section>
+        <h2>Blind spots</h2>
+        <label>Alarm above <output id="v-threshold"></output>
+          <input id="threshold" type="range" min="1.05" max="3" step="0.05" value="1.5">
+        </label>
+        <div class="legend" aria-hidden="true"></div>
+        <div class="legend-scale"><span>tight</span><span>nominal</span><span>blind</span></div>
+        <dl id="stats">
+          <dt>Worst gap</dt><dd id="s-worst">—</dd>
+          <dt>Over alarm</dt><dd id="s-over">—</dd>
+          <dt>Unmapped</dt><dd id="s-unmapped">—</dd>
+          <dt>Probe</dt><dd id="s-probe">click the canvas</dd>
+        </dl>
+        <p class="note">Every cell is scored by the widest gap that opens around it during a full turn, divided by the gap a clean grid of this pitch would leave. ×1 is as good as undistorted; ×2 means something twice as big can hide there.</p>
+      </section>
+
+      <section>
+        <h2>Keys</h2>
+        <dl class="keys">
+          <dt>1–4</dt><dd>grid form</dd>
+          <dt>Space</dt><dd>pause / resume</dd>
+          <dt>B</dt><dd>blind-spot map</dd>
+          <dt>[ ]</dt><dd>slower / faster</dd>
+          <dt>− +</dt><dd>pitch</dd>
+          <dt>H</dt><dd>hide the controls</dd>
+          <dt>R</dt><dd>reset</dd>
+        </dl>
+      </section>
+    </aside>
+  </main>
+
+  <script src="js/distort.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/analyze.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
