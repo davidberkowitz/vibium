@@ -61,7 +61,7 @@ serve: build-go
 	./clicker/bin/clicker serve
 
 # Run all tests
-test: build test-cli test-js test-mcp test-mindmap test-gridprobe
+test: build test-cli test-js test-mcp test-mindmap test-gridprobe test-loadpath
 
 # Run CLI tests (tests the clicker binary directly)
 # Process tests run separately with --test-concurrency=1 to avoid interference
@@ -92,6 +92,15 @@ test-mindmap:
 test-gridprobe:
 	@echo "━━━ Grid Probe Tests ━━━"
 	node --test tests/gridprobe/probe.test.js
+
+# Run driver load path tests (pure logic, no browser or build needed)
+test-loadpath:
+	@echo "━━━ Driver Load Path Tests ━━━"
+	node --test tests/loadpath/model.test.js
+
+# Print the Driver Load Path M0 model report (headless, no browser)
+loadpath-report:
+	node apps/loadpath/js/m0-report.js
 
 # Serve the mind map app on http://localhost:8080
 mindmap:

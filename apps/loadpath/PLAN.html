@@ -112,6 +112,10 @@ tr:last-child td{border-bottom:none}
 .ms-id{font-family:"IBM Plex Mono",monospace;font-size:.78rem;font-weight:600;color:var(--act);padding-top:1px}
 .ms-b h3{margin-bottom:4px}
 .ms-b p{font-size:.87rem;color:var(--ink-2);line-height:1.5}
+.ms-row.done .ms-id::after{content:"\2713";color:var(--react);margin-left:5px;font-weight:700}
+.ms-row.done h3::after{content:"built";font-family:Archivo,sans-serif;font-size:.58rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--react);border:1px solid var(--react);border-radius:2px;
+  padding:2px 6px;margin-left:9px;vertical-align:2px}
 .ms-out{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);line-height:1.45;text-align:right}
 @media(max-width:700px){.ms-row{grid-template-columns:3rem 1fr}.ms-out{grid-column:2;text-align:left}}
 
@@ -170,9 +174,9 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>A &middot; pre-build</dd></div>
+    <div><dt>Revision</dt><dd>B &middot; M0 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
-    <div><dt>Status</dt><dd>Awaiting go</dd></div>
+    <div><dt>Status</dt><dd>M0 green, 57 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
     <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
     <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
@@ -375,7 +379,12 @@ footer b{color:var(--ink-2);font-weight:600}
 │   │   └── <b>assumptions.js</b>    <i>the provenance drawer, built in M2 not last</i>
 │   ├── <b>scenarios.js</b>          <i>scripted maneuvers as input timelines</i>
 │   └── <b>app.js</b>
-├── tests/<b>model.test.js</b>       <i>third-law audit, ellipse bounds, energy sanity</i>
+├── <b>README.md</b>
+└── <b>LEARNING.md</b>
+
+<i>tests live at the repo root, following the convention already set by
+gridprobe and mindmap, not inside the app directory:</i>
+tests/loadpath/<b>model.test.js</b>   <i>third-law audit, ellipse bounds, load-transfer sanity</i>
 ├── images/
 ├── <b>README.md</b>
 └── <b>LEARNING.md</b></pre>
@@ -387,7 +396,7 @@ footer b{color:var(--ink-2);font-weight:600}
     <p>Physics before pixels. Milestone 0 has no interface at all, it prints a table to the console, because a wrong number rendered beautifully is worse than a right number rendered plainly.</p>
   </div>
   <div class="ms">
-    <div class="ms-row"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists.</p></div><span class="ms-out">console table<br>green tests</span></div>
+    <div class="ms-row done"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists. <b>Done.</b> 57 tests green; worst third-law residual across ten scenarios is 2.5&times;10<sup>&minus;13</sup>&nbsp;N. Run it with <code>make loadpath-report</code>.</p></div><span class="ms-out">console table<br>57 tests green</span></div>
     <div class="ms-row"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
     <div class="ms-row"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source.</p></div><span class="ms-out">live force split<br>sources panel</span></div>
     <div class="ms-row"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so.</p></div><span class="ms-out">2 views<br>5 inputs</span></div>
@@ -421,6 +430,9 @@ footer b{color:var(--ink-2);font-weight:600}
   <div class="risk"><h3>Vibration and steady-state are different mathematics</h3>
     <p>Load transfer is a time-domain quasi-static balance. Whole-body vibration is a frequency-domain weighted RMS over an exposure window. Merging them into one solver produces a mess that satisfies neither.</p>
     <p class="fix"><em>Mitigation</em>Keep vibration as a separate overlay channel with its own units and its own panel. Do not average a comfort index into a force arrow.</p></div>
+  <div class="risk"><h3>The anthropometry has one body type in it</h3>
+    <p>Building M0 surfaced a contradiction the plan did not have. The occupant presets offer a 5th percentile female, but the segment mass fractions every one of them is multiplied by come from Dempster's 1955 sample of nine male white cadavers. Changing the total mass does not change the proportions, so the "female" preset is a scaled male.</p>
+    <p class="fix"><em>Mitigation</em>The caveat now travels with the numbers in the constants file and prints in the M0 report. Before the presets reach a user-facing control, either source sex-specific fractions or relabel the control as a mass slider and stop implying it models a different body.</p></div>
   <div class="risk"><h3>This app has nothing to do with the repository it lives in</h3>
     <p>vibium is browser automation for AI agents. A vehicle biomechanics simulation is not that. It joins gridprobe and mindmap as unrelated projects sharing a tree, and CLAUDE.md does not acknowledge that apps/ is a scratch space.</p>
     <p class="fix"><em>Mitigation</em>Either add one line to CLAUDE.md declaring apps/ an explicit sandbox for side projects, or move all three out. Naming it beats letting the drift continue silently.</p></div>
@@ -447,7 +459,7 @@ footer b{color:var(--ink-2);font-weight:600}
 <tr><td>CG height</td><td>0.55 m</td><td>Sedan typical, user-adjustable</td><td>Design choice</td></tr>
 <tr><td>Tire friction &mu;</td><td>0.90 dry, 0.60 wet</td><td>Dry and wet asphalt, passenger tire</td><td>Design choice</td></tr>
 <tr><td>Occupant mass</td><td>78 kg default</td><td>50th percentile male; 5th percentile female offered as alternate</td><td>Verify at M0</td></tr>
-<tr><td>Segment mass fractions</td><td>head+neck 8.1%, trunk 49.7%, thigh 10.0%, shank 4.65%, foot 1.45%</td><td>Winter, anthropometric table, from prior knowledge</td><td>Unverified this session</td></tr>
+<tr><td>Segment mass fractions</td><td>head+neck 8.1%, trunk 49.7%, thigh 10.0%, shank 4.65%, foot 1.45%</td><td>Dempster (1955), reproduced in Winter. Sample: nine male white cadavers</td><td>Corroborated; sums to 1.000 exactly, asserted in tests</td></tr>
 <tr><td>Vibration weighting</td><td>W<sub>k</sub> on z with k=1.0; W<sub>d</sub> on x and y with k=1.4</td><td>ISO 2631-1:1997</td><td>Verified by search</td></tr>
 <tr><td>Comfort banding</td><td>&le;0.315 not uncomfortable; 0.315&ndash;0.63 a little uncomfortable</td><td>ISO 2631-1:1997 comfort reactions scale</td><td>Verified by search</td></tr>
 <tr><td>Seated vertical resonance</td><td>4&ndash;6 Hz principal, falling with amplitude; 8&ndash;12 Hz second mode</td><td>Apparent-mass literature, seated whole-body vibration</td><td>Verified by search, corrected</td></tr>

@@ -356,3 +356,222 @@ time; using a vague tool for a precise job produces `DRYWRY FORCE ITION`.
 
 *Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
 Google Gemini Nano Banana.*
+
+---
+---
+
+# Learning, part two: building M0
+
+The plan is one thing. Writing the code that has to actually be right is another. Here's what
+happened when the model core got built, in the same over-coffee register.
+
+## Step 1 — Approach: pick the frame before writing a single equation
+
+The very first thing I wrote wasn't math. It was this comment:
+
+> Frame: ISO 8855. x forward, y to the driver's **left**, z up.
+
+That looks like bookkeeping. It's the highest-leverage line in the whole milestone, because
+**every sign error you will ever have lives in the gap between two people's coordinate frames.**
+There are two competing standards here: SAE J670 uses x forward, y *right*, z *down*; ISO 8855
+uses x forward, y *left*, z *up*. Both are correct. Mix them and a left turn silently becomes a
+right turn somewhere in the middle of your codebase, and every arrow you draw afterward is a lie.
+
+I picked ISO because z-up is what a human expects when the subject is a person sitting upright,
+and then I wrote the consequence down explicitly: *positive lateral acceleration is a left turn,
+so the loaded outer wheels are on the right.* That sentence is what the tests assert against.
+
+Then the equations went in the plan's order — cornering, load transfer, friction ellipse, then
+occupant — because each one consumes the previous one's output.
+
+## Step 2 — Roads not taken, this time
+
+**Rejected: `{value: 1600, source: "..."}` for every constant.** My first instinct was to attach
+provenance directly to each number, so it's impossible to have one without the other. I wrote a
+bit of it and threw it away, because every piece of arithmetic downstream turns into
+`params.mass.value * params.cgHeight.value` and the physics becomes unreadable. Unreadable
+physics is how sign errors hide.
+
+What I did instead: two parallel exports. `CONSTANTS` holds plain numbers so the math reads like
+math. `PROVENANCE` holds one record per number. And then — this is the part that makes it work —
+**a test walks every numeric constant and fails if it has no provenance record.** The structure
+doesn't enforce the pairing; the test does. Same guarantee, readable code.
+
+That's a general pattern worth stealing: when the clean-looking enforcement mechanism makes the
+primary code worse, move the enforcement into a test instead.
+
+**Rejected: the plan's own file layout.** The plan said tests go in `apps/loadpath/tests/`. The
+repository already had `tests/gridprobe/` and `tests/mindmap/` at the root, wired into a Makefile
+target. I followed the repo, not my own document, and then went back and corrected the document.
+
+Worth being explicit about the priority order: **an existing convention in the codebase beats a
+plan I wrote yesterday.** A plan is a prediction. A convention is a fact. When they disagree, the
+plan was wrong, and the fix is to update the plan — not to quietly leave two contradicting
+descriptions of the same project lying around.
+
+**Rejected: a placeholder contact-force split.** It would have been easy, and mildly satisfying,
+to stub in "60% seat pan, 25% bolster, 15% belt" so the milestone produced richer output. I
+didn't, because the plan explicitly puts that in M2 and because a plausible-looking placeholder
+is exactly the kind of number that survives into production by accident. Instead the report ends
+with a line saying, in plain words, that the split isn't modelled yet and why.
+
+## Step 3 — The test that made all the others meaningful
+
+Here's the one I want you to actually remember.
+
+There are 57 tests. 20 of them are the Newton's third law audit, run across ten driving
+scenarios. They all pass. Great — except a test that always passes proves nothing at all, and I
+had no evidence that this audit could ever *detect* anything.
+
+So I wrote this:
+
+```js
+test('the audit is capable of failing', () => {
+  const s = O.solve({ bodyMass: DRIVER, accel: O.vec(-6, 4, 0) });
+  s.segments[0].carOnBody.x += 50;          // inject a 50 N error
+  s.carOnBody = s.segments.reduce(...);      // recompute the total
+  assert.ok(O.auditThirdLaw(s).sumResidual > 49, 'the audit missed a 50 N error');
+});
+```
+
+Deliberately break the state, then assert that the check screams. This is called a **negative
+control**, and it's standard in lab science and weirdly rare in software. The reasoning is simple:
+if your smoke alarm has never once gone off, you don't know whether you live in a safe house or
+own a broken alarm.
+
+Any time you write a validator, an assertion, a lint rule, a monitoring check — write the test
+that proves it fires. It takes four lines and it converts "all green" from a hope into a fact.
+
+## Step 4 — The bug the milestone found in the plan
+
+This is the good part.
+
+The constants file has three occupant presets: 50th percentile male, 95th percentile male, and
+5th percentile female. Perfectly reasonable. And the segment mass fractions come from Dempster's
+1955 study, which I'd confirmed by search.
+
+While writing the provenance record I actually read what the search had told me about the source.
+Dempster's sample was **nine male white cadavers.**
+
+Sit with the implication for a second. The fractions say a trunk is 49.7% of body mass, a thigh
+10%, and so on. Selecting the "5th percentile female" preset changes the total mass from 78 kg to
+49 kg — and then multiplies it by *exactly the same proportions*. **The female preset is a scaled
+male.** Body composition genuinely differs between sexes in ways that change these fractions, so
+the preset is presenting a difference it does not actually model.
+
+Nobody would have caught this from the output. The numbers are internally consistent, they sum to
+1.000, every test passes. It's only visible if you read the provenance of the data instead of just
+the data.
+
+Three things came out of it. The caveat now lives in `constants.js` next to the numbers. It prints
+at the bottom of every report run under the heading "numbers you should not quote yet." And it's a
+new entry in the plan's failure-modes section with a concrete fix: either find sex-specific
+fractions, or relabel the control as a plain mass slider and stop implying it models a different
+body.
+
+The general lesson: **"where did this data come from" is a different question from "is this data
+correct," and only the first one catches this class of error.** The number was right. The *use* of
+it was wrong.
+
+## Step 5 — Tradeoffs made in the code
+
+| Chose | Gave up | Why |
+|---|---|---|
+| IIFE modules on the global | Modern ES modules, tree shaking | Matches gridprobe exactly; works in `require()` and in a `<script>` tag with no build step |
+| `ay = δv²/(L + Kv²)` | The textbook `δ = L/R + K·a_y` form | Algebraically identical, but returns exactly 0 at a standstill instead of dividing by zero |
+| Report shows *demanded* friction % but *clamped* acceleration | One consistent number | You want to see both: what the driver asked for, and what the tyres actually delivered. The status column names the gap |
+| Lateral transfer split by static weight | Split by roll stiffness (correct) | Roll stiffness needs spring and anti-roll-bar rates we don't have. Marked `placeholder`, prints as a caveat |
+| Plain console table | Even a minimal HTML view | The whole point of M0 |
+
+## Step 6 — Mess
+
+**The 14 that I called 12.** I wrote a test named "segment masses expand to twelve physical parts"
+and asserted `segs.length === 14`. Both the assertion and the code were right; the *name* was
+wrong. Eight segment types, six of which come in pairs: 2 + 12 = 14. I'd mentally anchored on the
+twelve touchpoints from the plan and let the number bleed across into an unrelated count.
+
+It passed. Tests don't check their own names. If someone reads that test in six months looking for
+the segment count, the comment lies to them and the code doesn't. Caught it on re-read and fixed
+it — but note the failure mode: **a passing test can still contain a false statement**, and that
+statement is documentation.
+
+**Sign conventions ate the most time.** Deriving the lateral load transfer, I first wrote
+`outer = axle/2 + ΔF/2`, halving the transfer. Wrong. Taking moments about the outer contact
+patch gives `inner = W/2 − ΔF` and `outer = W/2 + ΔF` — the full ΔF is added to one side and
+subtracted from the other. The half-factor felt intuitively right because "it's split between two
+wheels," and intuition is exactly the wrong instrument here.
+
+What saved it was a test I'd written for a different reason: *load transfer redistributes weight,
+it never creates or destroys it.* Sum all four corners across six different acceleration states
+and you must get the vehicle's weight back, to 1e-8. The halved version passed that too, actually
+— so what really caught it was working the moment balance on paper. But the conservation test is
+still the one I'd keep, because it catches the larger family of errors.
+
+**Egress blocked the primary sources again.** I still could not reach Winter's table or the
+Waterloo paper. What I could do was an *internal* check that needs no source at all: the fractions
+sum to exactly 1.000. That's a real constraint — a body is one body — and it's now an assertion.
+It doesn't prove the values are Dempster's, but it proves they're mutually consistent, which rules
+out a whole class of transcription error.
+
+**Verification you can do locally beats verification you can't do at all.** When the source is out
+of reach, look for an invariant the data must satisfy on its own terms.
+
+## Step 7 — Pitfalls for next time
+
+- **Write the frame convention down before the first equation.** Then write the *consequence*
+  ("positive ay is a left turn, outer wheels are on the right") as prose, and test against the
+  prose.
+- **Never halve a load transfer.** Derive it from a moment balance once and write the derivation
+  in the comment so nobody re-guesses it.
+- **Conservation tests are cheap and catch things you didn't predict.** Sum-of-corners equals
+  weight. Sum-of-segments equals body. These take two minutes and cover errors you'd never think
+  to enumerate.
+- **Read your data's provenance, not just its values.** The Dempster sample problem was invisible
+  from every number in the system.
+- **Test names are documentation and nothing checks them.** Re-read them as prose.
+- **Handle bad CLI input on the first pass.** `--surface ice` prints the three valid options and
+  exits 1. Thirty seconds of work, and it's the difference between a tool and a script.
+
+## Step 8 — What an expert notices here
+
+**An expert reads the friction column and the acceleration column together and immediately asks
+which one is the demand and which is the delivery.** In the panic stop row, friction says 102% and
+the acceleration says exactly 0.90 g. Those look contradictory until you realise one is what the
+driver asked for and the other is what the road gave. A beginner reconciles them into one number
+and loses the most interesting fact on the row.
+
+**An expert is suspicious of a test suite with no negative controls.** Fifty-seven green tests is
+not evidence until at least one of them has been shown capable of turning red.
+
+**An expert treats "it sums correctly" as necessary, not sufficient.** The segment fractions sum
+to 1.000 and are still drawn from a sample that makes one of the presets misleading.
+
+**An expert writes the limitation into the output, not just the docs.** Anyone can put a caveat in
+a README nobody opens. Printing "numbers you should not quote yet" at the bottom of every single
+run means the caveat is in front of the person at the moment they're about to quote something.
+
+## Step 9 — What transfers
+
+**Negative controls generalise everywhere.** Any check you rely on — a test, an alert, a
+reconciliation, a fraud rule, a code review checklist — should be deliberately tripped once so you
+know it works. "We've never had an incident" and "our detection is broken" produce identical
+dashboards.
+
+**Provenance is a separate axis from correctness.** A number can be accurate and still be the
+wrong number for the job, and only the question *where did this come from, and on what sample*
+distinguishes them. This applies to a market-size figure in a deck, a benchmark in a vendor
+comparison, and a body-segment table alike.
+
+**When two of your own documents disagree, one of them is now actively harmful.** The plan said
+tests go in one place; the repo said another. Leaving both is worse than either, because the next
+person has to guess. Pick, then go back and fix the loser.
+
+**Look for the invariant when you can't reach the source.** Things that must be true internally —
+a body is one body, weight is conserved, a proportion sums to one — give you real verification
+when external checking is unavailable.
+
+**Make the caveat travel with the number.** Not in a footnote, not in the appendix. In the same
+struct, printed in the same output, so it can't get separated from the thing it qualifies.
+
+*Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
+Google Gemini Nano Banana.*
