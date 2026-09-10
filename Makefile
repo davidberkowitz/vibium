@@ -96,11 +96,16 @@ test-gridprobe:
 # Run driver load path tests (pure logic, no browser or build needed)
 test-loadpath:
 	@echo "━━━ Driver Load Path Tests ━━━"
-	node --test tests/loadpath/model.test.js
+	node --test tests/loadpath/model.test.js tests/loadpath/touchpoints.test.js
 
-# Print the Driver Load Path M0 model report (headless, no browser)
+# Print the Driver Load Path model report (headless, no browser)
 loadpath-report:
 	node apps/loadpath/js/m0-report.js
+
+# Serve the Driver Load Path app on http://localhost:8081
+loadpath:
+	@echo "Driver Load Path: http://localhost:8081"
+	cd apps/loadpath && python3 -m http.server 8081
 
 # Serve the mind map app on http://localhost:8080
 mindmap:
