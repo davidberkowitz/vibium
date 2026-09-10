@@ -82,7 +82,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .contact.is-active .contact-label { fill: var(--fg); }
 .contact { cursor: pointer; }
 .contact:focus { outline: none; }
-.contact.is-selected .dot { fill: var(--react); r: 7; }
+/* Selection must not resize the marker: radius already encodes load, so
+   forcing r here made the most-loaded contact shrink when you clicked it.
+   Ring it instead and leave the size alone. */
+.contact.is-selected .dot { fill: var(--react); stroke: var(--react); stroke-width: 3; stroke-opacity: .35; }
 .contact.is-selected .contact-label { fill: var(--react); font-weight: 600; }
 .contact.is-selected .leader path { stroke: var(--react); }
 .contact:focus-visible .contact-label { text-decoration: underline; }
@@ -204,3 +207,86 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   .row .note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- M2: force values, and the provenance drawer ---------- */
+.contact-force { fill: var(--act); font-weight: 600; }
+.contact.is-idle .contact-force { fill: var(--line-strong); }
+.contact.is-selected .contact-force { fill: var(--react); }
+
+.row.contact-row .v.force {
+  flex: 0 0 4.4em; text-align: right; font-size: 11.5px;
+}
+.row.contact-row.off .v.force { color: var(--line-strong); }
+.row.contact-row .bar { flex: 0 0 2.4em; }
+/* The longest label, "Brake / throttle pedal", wrapped to two lines and threw
+   that row out of alignment with the other eleven. */
+.row.contact-row { gap: 7px; }
+.row.contact-row .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.contact-row .pill { font-size: 9.5px; padding: 1px 5px; }
+.row.contact-row .bar i { background: var(--act); }
+
+.detail-force {
+  display: flex; align-items: baseline; gap: 9px; margin: 10px 0 4px;
+  padding: 8px 10px; background: var(--bg-sunk); border-left: 2px solid var(--act);
+}
+.detail-force.idle { border-left-color: var(--line-strong); }
+.detail-force .fv {
+  font-family: ui-monospace, monospace; font-size: 17px; font-weight: 600;
+  color: var(--act); font-variant-numeric: tabular-nums;
+}
+.detail-force.idle .fv { color: var(--fg-dim); font-size: 13px; }
+.detail-force .fl { font-size: 11px; color: var(--fg-dim); line-height: 1.4; }
+
+button.ghost {
+  background: transparent; color: var(--fg-dim);
+  border: 1px solid var(--line-strong); border-radius: 3px;
+  padding: 4px 10px; font: inherit; font-size: 11.5px; cursor: pointer;
+}
+button.ghost:hover { color: var(--fg); border-color: var(--fg-dim); }
+button.ghost:focus-visible { outline: 2px solid var(--react); outline-offset: 1px; }
+button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--react); }
+
+.drawer {
+  position: fixed; top: var(--toolbar-h); right: 0; bottom: 0; width: min(520px, 100%);
+  background: var(--bg-soft); border-left: 1px solid var(--line-strong);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, .45);
+  overflow-y: auto; z-index: 20; padding: 0 0 40px;
+}
+.drawer[hidden] { display: none; }
+.drawer-head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; background: var(--bg-soft); border-bottom: 1px solid var(--line);
+}
+.drawer-head h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.drawer-close {
+  background: none; border: none; color: var(--fg-dim); font-size: 22px;
+  line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.drawer-close:hover { color: var(--fg); }
+.drawer-close:focus-visible { outline: 2px solid var(--react); outline-offset: 2px; }
+.drawer-lede { margin: 0; padding: 14px 18px; color: var(--fg-dim); font-size: 12.5px; line-height: 1.55; }
+
+.prov-group { padding: 6px 18px 14px; border-top: 1px solid var(--line); }
+.prov-group h3 { margin: 12px 0 4px; display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.grp-count { color: var(--line-strong); font-size: 11px; font-weight: 400; }
+.grp-blurb { margin: 0 0 10px; color: var(--fg-dim); font-size: 11.5px; line-height: 1.5; }
+.prov { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.prov:last-child { border-bottom: none; }
+.prov-key { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--fg); }
+.prov-val {
+  font-family: ui-monospace, monospace; font-size: 11px; color: var(--react);
+  margin-top: 2px; font-variant-numeric: tabular-nums;
+}
+.prov-src { font-size: 12px; color: var(--fg-dim); line-height: 1.5; margin-top: 4px; }
+.prov-caveat {
+  font-size: 11.5px; color: var(--warn); line-height: 1.5; margin-top: 6px;
+  border-left: 2px solid var(--warn); padding-left: 9px;
+}
+.drawer-foot { padding: 14px 18px; border-top: 1px solid var(--line-strong); }
+.drawer-foot p { margin: 0; color: var(--fg-dim); font-size: 11.5px; line-height: 1.55; }
+
+@media (max-width: 900px) {
+  .drawer { top: 0; width: 100%; border-left: none; }
+  body.drawer-open { overflow: hidden; }
+}

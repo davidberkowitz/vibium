@@ -819,3 +819,222 @@ So the rule from step 9 gets sharper. It isn't "look at the output." It's **look
 every state a user can put it in**: each viewport, each selection, empty and full. A single
 screenshot of a single state is one sample from a space, and bugs live in the parts you didn't
 sample.
+
+---
+---
+
+# Learning, part four: building M2, the indeterminate split
+
+This is the one the whole project was pointed at. Two milestones of saying "we don't model that
+yet" finally came due.
+
+## Step 1 — Approach: solve the dual, not the problem
+
+The problem: the total force on the driver is known, but there are fourteen ways it could reach
+them and only three equations of force balance. Infinitely many valid answers. Pick one, on
+principle.
+
+The principle was decided back in the plan — minimum stored elastic energy, subject to each
+contact only pushing or pulling the way it physically can. That makes it a **quadratic program**:
+minimise a sum of squares, subject to equalities and inequalities.
+
+The obvious move is to reach for a QP library. I didn't, and the reason is the most satisfying
+thing in this milestone.
+
+Substituting `lambda = sqrt(k) * z` turns the objective into a plain minimum-norm problem. Write
+down its optimality conditions — the Karush-Kuhn-Tucker conditions, the standard characterisation
+of a constrained optimum — and they collapse to something startling:
+
+```
+z = clamp(A' y, 0, cap)     for some y in R^3
+```
+
+Every one of the fourteen unknowns is a **function of just three numbers.** Substituting that back
+into the force balance leaves an unconstrained convex minimisation in three variables, which
+Newton's method eats in tens of iterations.
+
+Think of it like this. You have fourteen dials to set and three readings to hit. Rather than
+searching fourteen-dimensional space, the maths says: all the settings that could possibly be
+optimal lie on a three-dimensional surface, parameterised by `y`. So stop searching the room and
+search the surface.
+
+**The payoff isn't speed, it's guarantees.** Because `z` is a clamp, no force can come back
+negative and none can exceed its cap — not because anything checks afterwards, but because the
+expression cannot produce such a value. A whole category of bug is structurally impossible rather
+than tested against.
+
+## Step 2 — Roads not taken
+
+**Rejected: a QP library.** Would have worked. It would also have been a dependency in a project
+whose architecture is "open index.html and it works," and it would have hidden the one genuinely
+interesting piece of reasoning inside a black box. The dual reduction is fifty lines and you can
+read why it's correct.
+
+**Rejected: hand-tuned percentages per driving regime.** The placeholder the plan warned about.
+Fast, and unfalsifiable in the bad sense: it outputs exactly what you told it to, so it can never
+surprise you, so it can never be wrong in a way you'd notice. It also jumps at regime boundaries.
+There's a test in this milestone that specifically checks the split moves *smoothly* as the input
+does, because that's the visible difference between a solved answer and a lookup table.
+
+**Rejected: modelling belt slack by displacement.** Correct, and it needs a dynamic model this
+one doesn't have. Instead the belts engage structurally: they come in only when the gap-free
+contacts cannot supply the required force on their own. That gets both ends right — nothing in
+the webbing going straight, belt engaged in a hard stop — and the caveat says plainly that the
+transition is a step where reality is gradual.
+
+**Rejected: shipping the provenance drawer in a later milestone.** It ships in the *same* one as
+the solver, because this is the exact moment the page starts putting authoritative newtons next
+to body parts.
+
+## Step 3 — The bug that only physics could catch
+
+First working version. All the maths right, balance closing to machine precision, no negative
+forces. And it reported that under **0.8 g braking, the seat belts carry exactly zero.**
+
+Every automated check passed. The force balance closed. No sign constraint was violated. And the
+result was nonsense — or rather, it was the correct answer to a question I'd asked wrong.
+
+What was missing: nothing limited how hard the driver could brace. The solver noticed it could
+push on the steering rim and the dead pedal, found that cheaper than loading the belt, and braced
+its way out of any deceleration you gave it. With unlimited arms, you never need a seatbelt.
+
+The fix was to add an upper bound to each voluntary channel. Mathematically small — `max(0, t)`
+becomes `clamp(t, 0, cap)`, and the Hessian excludes channels pinned at either limit. Physically
+it changes everything: bracing has a ceiling, and past it the load has to go somewhere else.
+
+Then a second calibration question, subtler. What *is* the ceiling? Maximum human capacity, or
+typical effort? If you use maximum — a genuine maximal leg press against the footrest — the belts
+still never engage, because a person really can brace against 1.2 g if that's all they're doing.
+But a driver in a panic stop isn't performing a maximal leg press. **They're busy braking and
+steering.** So the caps are typical voluntary effort, and they're flagged as the placeholder that
+moves the model's single most visible result.
+
+With that, the behaviour came right: gentle stop absorbed by bracing, hard stop saturates the
+bracing and the shoulder belt becomes the largest single contact on the body. Which is what a
+seatbelt is *for*.
+
+**The lesson: a model can be mathematically flawless and physically incomplete, and only domain
+reasoning tells the difference.** No test I could have written from inside the code would have
+flagged "this driver has unlimited arms."
+
+## Step 4 — An emergent result I didn't build
+
+Once the belts engaged, the output showed something I hadn't put there: in a **straight-line**
+hard stop, the side bolster picks up load. Lateral force, in a car going perfectly straight.
+
+That's correct. A shoulder belt runs diagonally across your body, so when it pulls you back it
+also pulls you sideways, and something has to resist that. The bolster does.
+
+I didn't code that. It fell out of representing forces as actual 3-D vectors with actual
+directions rather than as scalars in labelled buckets. There's now a test asserting it, because a
+result you can derive but didn't intend is the best evidence your representation is real and not
+a pile of special cases.
+
+## Step 5 — Tradeoffs
+
+| Chose | Gave up | Why |
+|---|---|---|
+| Dual reduction, hand-rolled | A library's robustness | Fifty readable lines, no dependency, guarantees by construction |
+| Caps as typical effort | Defensible maximum-capacity numbers | Maximum effort predicts belts that never engage, which is wrong |
+| Tuned stiffnesses | Measured ones | A point-mass occupant discards limb geometry; the ratios absorb it |
+| Structural slack rule | Displacement-based engagement | Needs a dynamic model; both endpoints come out right |
+| Stall detection | Chasing the last 1e-6 N | Six orders below the model's own uncertainty |
+| Solver + drawer in one milestone | A faster-looking M2 | Provenance retrofitted is provenance never built |
+
+## Step 6 — The mess
+
+**Iteration zero did nothing.** The first run reported every case infeasible after zero
+iterations. The cause: starting Newton at the origin, where no channel is active, so the
+generalised Hessian is *empty* — zero information about which way to step. The line search then
+failed on its first attempt and the loop broke immediately.
+
+Fixed by warm-starting from the unconstrained least-norm solution, `y = (AA')^-1 b`, which
+activates a sensible set straight away and is the exact answer whenever no constraint binds.
+**A Newton method needs somewhere to start where its derivative means something.**
+
+**The line search rejected everything when the objective was zero.** My acceptance test was
+"phi must decrease by a relative amount," which at phi = 0 demands a strictly negative value.
+Replaced with the standard Armijo condition, which measures against the directional derivative
+rather than the value.
+
+**It stalled at 200 iterations for no gain.** At certain accelerations two channels sit exactly at
+their caps, the Hessian loses rank in that direction, and the active set chatters — flipping a
+channel between free and saturated, making no progress. Added stall detection, and dropped the
+worst case from 200 iterations to 32.
+
+Then the honest part: my module comment claimed the balance closed "to machine precision." After
+the stall fix, the worst residual across 1881 swept cases was 7.4e-6 N. That's six parts per
+billion of a 1000 N load and utterly irrelevant physically — but it is not machine precision. I
+rewrote the comment to state the real bound and say why chasing it further would be silly.
+**A comment that overstates precision is a small lie that someone will later rely on.**
+
+**Selecting a contact made it shrink.** The marker radius encodes load, and the CSS for the
+selected state forced a fixed radius. Click the most-loaded contact and it got *smaller*. Caught
+by looking, again. Fixed with a ring instead of a resize.
+
+## Step 7 — Pitfalls
+
+- **Notice indeterminacy yourself.** Nothing errors. Count unknowns against independent equations;
+  if unknowns win, you have a modelling choice to make, and if you don't make it, your code makes
+  it for you.
+- **Give every optimiser a ceiling, not just a floor.** "This can't go negative" is half the
+  physics. "This can't exceed what a person can do" is the other half, and its absence produces
+  comfortable, wrong answers.
+- **Warm-start Newton somewhere its derivative is informative.** The origin is often the worst
+  possible starting point.
+- **Armijo, not relative decrease.** The naive test breaks exactly where the objective is near
+  zero, which is near the answer.
+- **Cap iterations AND detect stalls.** They're different failures; only one is fixed by more
+  iterations.
+- **Don't claim machine precision unless you measured it.** State the bound you actually observed.
+- **When calibration is unavoidable, say what you calibrated to.** Tuned-to-a-known-answer is
+  legitimate. Silently tuned is not.
+
+## Step 8 — What an expert notices
+
+**An expert asks what the solution is optimal *for*.** Any answer satisfying the balance is
+"valid." Only one is what an elastic structure does. A beginner tests the constraint and declares
+victory; the constraint is the easy half.
+
+**An expert reads the zeros.** The headline number here is 537 N in the shoulder belt during a
+panic stop. The *informative* numbers are the two exact zeros in the belts at rest. A model that
+loads everything a little is a model that isn't deciding anything.
+
+**An expert distrusts an unbounded variable.** Any quantity with no upper limit will be exploited
+by an optimiser to make its objective look good. Unlimited bracing was that variable here.
+
+**An expert treats an unintended-but-correct result as evidence.** The bolster loading during a
+straight-line stop wasn't designed. Emergent correctness is a much stronger signal than a passing
+test, because you couldn't have accidentally written it.
+
+**An expert makes guarantees structural rather than tested.** "No force is negative" isn't
+asserted after the fact here; the clamp makes it unrepresentable. Whenever you can move a property
+from *checked* to *impossible*, do.
+
+## Step 9 — What transfers
+
+**Look for the dual.** When a problem has many unknowns and few binding constraints, the answer
+often lives in a space the size of the *constraints*, not the *unknowns*. Fourteen dials became
+three. This shows up far past optimisation: in negotiation, the space of deals is huge but the
+space of *binding issues* is small; solve there.
+
+**Every optimiser needs a ceiling.** Give a system an objective and one unbounded lever, and it
+will pull that lever. This is the shape of nearly every incentive failure, metric gaming and
+reward-hacking story you have ever heard. Unlimited bracing was mine.
+
+**Mathematically flawless is not physically complete.** Internal consistency proves your reasoning
+follows from your assumptions, and nothing whatsoever about your assumptions. Only domain
+knowledge closes that gap.
+
+**Emergent correctness is the best evidence you have.** When a model produces something true you
+didn't put in, your representation is capturing structure rather than encoding your expectations.
+Actively look for these; they're worth more than a hundred passing assertions.
+
+**Say what you calibrated to.** Tuning to a known answer is honest and often necessary. Tuning
+silently turns your model into an elaborate way of restating what you already believed.
+
+**Move guarantees from checked to impossible.** A test that catches a bad state is good. A
+representation that cannot express one is better, and it never goes stale.
+
+*Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
+Google Gemini Nano Banana.*

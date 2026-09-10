@@ -174,9 +174,9 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>C &middot; M1 built</dd></div>
+    <div><dt>Revision</dt><dd>D &middot; M2 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
-    <div><dt>Status</dt><dd>M1 green, 69 tests</dd></div>
+    <div><dt>Status</dt><dd>M2 green, 126 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
     <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
     <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
@@ -368,7 +368,7 @@ footer b{color:var(--ink-2);font-weight:600}
 │   │   ├── <b>touchpoints.js</b>    <i>built &middot; the twelve contacts: anatomy, axis, sign constraint</i>
 │   │   ├── <b>vehicle.js</b>        <i>built &middot; EQ 1–4: cornering, load transfer, friction ellipse</i>
 │   │   ├── <b>occupant.js</b>       <i>built &middot; EQ 5–6: segment masses, required force, third-law audit</i>
-│   │   ├── <b>contacts.js</b>       <i>M2 &middot; the QP: unilateral least-norm force split</i>
+│   │   ├── <b>contacts.js</b>       <i>built &middot; the QP: box-constrained least-norm force split</i>
 │   │   └── <b>vibration.js</b>      <i>M5 &middot; EQ 7: Wk/Wd weighting, ISO comfort banding</i>
 │   ├── view2d/
 │   │   ├── <b>vectors.js</b>        <i>built &middot; arrows, leaders, force-to-length scaling</i>
@@ -377,7 +377,7 @@ footer b{color:var(--ink-2);font-weight:600}
 │   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gated, may be cut</i>
 │   ├── ui/
 │   │   ├── <b>controls.js</b>       <i>M3 &middot; sliders, playback transport</i>
-│   │   └── <b>assumptions.js</b>    <i>M2 &middot; the provenance drawer</i>
+│   │   └── <b>assumptions.js</b>    <i>built &middot; the provenance drawer</i>
 │   ├── <b>scenarios.js</b>          <i>M4 &middot; scripted maneuvers as input timelines</i>
 │   ├── <b>m0-report.js</b>          <i>built &middot; headless harness, kept past M1 — see note</i>
 │   └── <b>app.js</b>                <i>built &middot; M1</i>
@@ -388,7 +388,8 @@ footer b{color:var(--ink-2);font-weight:600}
 <i>Tests live at the repo root, following the convention already set by gridprobe
 and mindmap rather than the app-local path this document first predicted:</i>
 tests/loadpath/<b>model.test.js</b>        <i>third-law audit, ellipse bounds, load transfer</i>
-tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, what is loaded at rest</i></pre>
+tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, what is loaded at rest</i>
+tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, and whether it picks the answer a body would</i></pre>
 
   <div class="note" style="margin-top:22px"><b>One prediction in this document reversed at M1</b>
   This plan said the headless report would be deleted once <code>app.js</code> arrived. It has been kept. It is the only thing that prints the unsourced constants on every run, it needs no browser, and deleting a working verification tool because a document predicted its removal is exactly the plan-over-reality mistake this project keeps trying to avoid. The document was wrong; the tool stays.</div>
@@ -402,12 +403,16 @@ tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, wh
   <div class="ms">
     <div class="ms-row done"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists. <b>Done.</b> 57 tests green; worst third-law residual across ten scenarios is 2.5&times;10<sup>&minus;13</sup>&nbsp;N. Run it with <code>make loadpath-report</code>.</p></div><span class="ms-out">console table<br>57 tests green</span></div>
     <div class="ms-row done"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled. <b>Done.</b> All twelve contacts placed on real anatomy, each selectable, each showing both directions of its force pair. Run it with <code>make loadpath</code>.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
-    <div class="ms-row"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source.</p></div><span class="ms-out">live force split<br>sources panel</span></div>
+    <div class="ms-row done"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source. <b>Done.</b> Solved through the dual, so a fourteen-variable program becomes a three-variable convex minimisation. Balance closes to under 10<sup>&minus;5</sup>&nbsp;N across the whole envelope. Two things went beyond what this plan specified &mdash; see below.</p></div><span class="ms-out">live force split<br>126 tests green</span></div>
     <div class="ms-row"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so.</p></div><span class="ms-out">2 views<br>5 inputs</span></div>
     <div class="ms-row"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
     <div class="ms-row"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
     <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
   </div>
+  <div class="note" style="margin-top:24px"><b>Two departures from this plan at M2</b>
+  First, the solver is <strong>box-constrained, not merely unilateral</strong>. This document specified only that foam cannot pull and webbing cannot push. Without also capping how hard a driver can brace, the solver braces its way out of any deceleration and concludes the belts never carry anything &mdash; a comfortable-sounding result that is wrong. Adding an upper bound is the same solver with a clamp in place of a maximum, and it is what makes the belts engage in a hard stop and stay slack in a gentle one.
+  Second, the stiffnesses had to be <strong>tuned to a known answer</strong> rather than measured, because a point-mass occupant throws away the limb geometry that really decides where load goes. They are absorbing kinematics the model does not have. Both are recorded as placeholders and both are visible in the drawer.</div>
+
   <div class="gate" style="margin-top:24px"><b>Go / no-go gate on the 3D view</b>
   The artifact content policy blocks external asset hosts, so there is no rigged human mesh to load. The 3D body has to be built procedurally, and procedural humans usually look wrong. A body that looks wrong will undermine numbers that are right, which is a net loss. If the M6 prototype does not look credible next to the 2D view, cut it and ship the 2D view alone. That is a real outcome, not a failure.</div>
 </section>
@@ -469,6 +474,9 @@ tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, wh
 <tr><td>Seated vertical resonance</td><td>4&ndash;6 Hz principal, falling with amplitude; 8&ndash;12 Hz second mode</td><td>Apparent-mass literature, seated whole-body vibration</td><td>Verified by search, corrected</td></tr>
 <tr><td>Friction ellipse</td><td>(F<sub>x</sub>/F<sub>x,max</sub>)&sup2; + (F<sub>y</sub>/F<sub>y,max</sub>)&sup2; = 1</td><td>Standard combined-slip tire model</td><td>Verified by search</td></tr>
 <tr><td>Lateral load transfer</td><td>&Delta;N/N&#8320; = (2h<sub>roll</sub>/t)(a<sub>y</sub>/g)</td><td>Standard roll-axis formulation</td><td>Verified by search</td></tr>
+<tr><td>Contact stiffnesses</td><td>seat pan 45 kN/m down to steering rim 3 kN/m</td><td>Effective path stiffness, tuned so the rest split matches seated-pressure findings</td><td>Placeholder; ratios matter, absolutes do not</td></tr>
+<tr><td>Bracing capacity</td><td>rim 120 N, footrest 250 N, knee 250 N, armrest 60 N, brake pedal 400 N</td><td>Typical voluntary effort, not maximum capacity</td><td>Placeholder; sets when the belts engage</td></tr>
+<tr><td>Seat-surface friction</td><td>not modelled</td><td>A cone constraint, needs a different solver</td><td>Omission; pushes load onto bolster and belt</td></tr>
 <tr><td>Body response lag</td><td>&tau; = 0.15 s, first order</td><td>Placeholder, tune against ride studies</td><td>Placeholder</td></tr>
 </tbody>
 </table>
