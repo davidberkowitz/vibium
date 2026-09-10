@@ -1,0 +1,358 @@
+# Learning: how the Driver Load Path plan got made
+
+Sitting-across-the-table version. What I did, what I threw away, and where the bodies are buried.
+
+---
+
+## Step 1 — The approach, and why
+
+The starting point was a decision about **what kind of object you were asking for**.
+
+"Plan to create a visual simulation" can mean two very different things. It can mean *go build
+me a thing and show your reasoning*, or it can mean *give me a plan I can approve or kill before
+anyone spends a day on it*. You said "ask me clarifying questions as needed," which settles it.
+Nobody asks clarifying questions about work that's already done. You wanted a plan you could
+steer.
+
+So the deliverable is a spec, and the first move was not to write anything — it was to find the
+**forks in the road where guessing wrong would waste the most work**. There were four:
+
+1. **Fidelity.** Illustrative arrows and real newtons are different projects. One is an
+   afternoon, one is a week, and they share almost no code.
+2. **Rendering.** 2D and 3D have completely different failure modes.
+3. **Scenarios.** Crash loading is a different universe from ride comfort — different sources,
+   different math, different liability.
+4. **Interaction.** Sliders versus a canned animation changes whether the physics has to run
+   in real time or can be precomputed.
+
+Each of those four questions, answered wrong, costs more than the question costs to ask. That's
+the test I use for whether to interrupt someone: **would the wrong guess cost more than the
+interruption?** Four times yes, so four questions, asked all at once rather than dribbled out.
+
+Then, before writing the plan, I did something that felt like a detour and wasn't: I went and
+**checked the physics facts I was about to assert**. More on why in step 6, because that's where
+it paid off.
+
+---
+
+## Step 2 — Roads not taken
+
+This is where the real learning is, so here are the ones I actively rejected.
+
+**Rejected: build a prototype first, plan second.** Tempting. I could have had something moving
+on screen fast. The reason I didn't is that this project's hard part is invisible from the
+outside. You can get a beautiful arrow-covered driver on screen in an hour and have every single
+number wrong, and *you would not be able to tell*. A prototype would have generated confidence
+without generating correctness. Worse, it would have anchored the architecture around whatever I
+happened to hack together. Prototype-first is right when the risk is "will this feel good." It's
+wrong when the risk is "is this true."
+
+**Rejected: asking one question at a time.** Conversational, feels natural, and it's a trap. Each
+round trip costs you attention, and the four questions weren't dependent on each other — the
+answer to "3D or 2D" doesn't change what I need to ask about fidelity. Independent questions go
+in one batch. Dependent ones go in sequence. Almost everyone gets this backwards and drips
+questions out one at a time because it feels more polite.
+
+**Rejected: including crash and emergency loading.** I offered it as an option and you left it
+out, which I think is right, and I'd have pushed back if you'd included it. Crash biomechanics is
+a regulated field with published test protocols and real consequences when someone gets a number
+wrong. It doesn't belong bolted onto a comfort-and-cornering toy. Scope creep in a simulation is
+not "a bit more work" — it's a *different evidentiary standard* for everything you display.
+
+**Rejected: putting the 3D view early.** You asked for both 2D and 3D, and I put 3D dead last
+behind an explicit kill gate. The reason is a specific technical constraint: the artifact
+sandbox blocks external asset hosts, so there's no rigged human model to download. Any 3D body
+has to be built procedurally out of primitives, and procedural humans land in the uncanny valley
+almost every time. **A body that looks wrong will make people distrust numbers that are right.**
+That's a net loss, so I built in permission to cut it.
+
+**Rejected: a general "vehicle dynamics simulator."** The gravitational pull on a project like
+this is to keep generalizing — add suspension geometry, add tire models, add a track editor. I
+deliberately pinned it to one narrow claim: *where does force enter your body, and what do you
+push back*. A sharp small question beats a fuzzy big one.
+
+**Rejected: hand-drawn SVG for the illustrations.** I hand-drew the technical schematic (the
+labeled touchpoint diagram) because that one has to be *exactly* right — every leader line points
+at a real anatomical location. But the four atmospheric illustrations went to a generative model,
+because there the job is "communicate a feeling of what this is," not "be dimensionally accurate."
+**Match the tool's precision to the job's precision requirement.**
+
+---
+
+## Step 3 — How the pieces connect
+
+The plan has an order, and the order is an argument. Here's the spine:
+
+```
+Section 01  What it is          →  establishes the ONE claim: force is reciprocal
+Section 02  Touchpoint register →  enumerates WHERE, twelve channels
+Section 03  Physics core        →  quantifies HOW MUCH, seven equations
+Section 04  Indeterminacy       →  admits what the equations DON'T determine
+Section 05  Architecture        →  turns 01-04 into files
+Section 06  Milestones          →  turns files into an order of operations
+Section 07  Failure modes       →  where 01-06 breaks
+Section 08  Provenance          →  which numbers are actually trustworthy
+Section 09  Illustration prompts
+Section 10  References
+```
+
+Notice the shape. **It goes claim → detail → math → limits of the math → build → risks →
+epistemics.** Every section is legible only because of the one before it. You can't judge the
+architecture in 05 without knowing about the indeterminacy problem in 04, and you can't
+appreciate 04 without the equations in 03.
+
+The single most important structural choice: **section 04 comes before section 05.** The hardest
+technical problem is stated *before* the file layout, because the file layout exists to solve it.
+`contacts.js` isn't a file I invented and then justified — it's a file that has to exist because
+of a mathematical fact established one section earlier. When a plan's architecture section reads
+like a list of plausible-sounding modules, that's usually the tell that nobody found the hard
+part yet.
+
+Same logic inside the milestones. M0 has **no user interface at all**. It prints a table to a
+console. That's not asceticism, it's sequencing: a wrong number rendered beautifully is more
+dangerous than a right number rendered plainly, because the beauty buys it credibility it hasn't
+earned.
+
+---
+
+## Step 4 — Tools and methods, and what the alternatives would have cost
+
+**Vehicle model: quasi-static rigid body with a bicycle model for cornering.**
+The alternatives were a full multibody dynamics model (correct, and impossible at sixty frames a
+second in a browser tab) or pure hand-waving. The bicycle model is the standard first
+approximation in vehicle dynamics: treat the car as two wheels on a centerline, ignore tire slip.
+It's genuinely accurate well below the traction limit and *honestly wrong* near it — which is a
+virtue, because you can then clamp the display at the limit and say so, rather than quietly
+extrapolating.
+
+**Force distribution: stiffness-weighted least-norm with unilateral constraints.**
+This one deserves a plain-language unpacking, because it's the intellectual core.
+
+Imagine you're holding a heavy table with four other people. Physics tells you the total weight
+everyone is holding — that's just the table's mass. Physics does *not* tell you how much each
+person is holding. Someone could be slacking. Someone could be taking most of it. The total is
+determined; the split isn't. Engineers call this **statically indeterminate**, and it shows up
+everywhere from bridge trusses to your own feet.
+
+The standard resolution is to stop treating the contacts as rigid and start treating them as
+springs. A stiff spring takes more load, a soft one takes less, and *the split that nature picks
+is the one that minimizes stored elastic energy*. That's not a heuristic, it's a real physical
+principle (minimum complementary energy). It gives smooth answers as you move a slider, and it
+satisfies the force balance exactly by construction rather than by hoping.
+
+Then the crucial twist: **sign constraints**. Seat foam can push you but cannot pull you. Belt
+webbing can pull you but cannot push you. Leave those constraints out and your solver will
+cheerfully report that the seat back is *pulling you toward it* during braking, which is
+nonsense the math is perfectly happy to produce. Adding the constraints turns a simple linear
+solve into a small quadratic program — a bit more code, and the difference between a simulation
+and a random number generator with good graphics.
+
+The alternative I rejected was hand-tuned percentages per driving regime. Faster to write, and
+fatally unfalsifiable: it outputs exactly what you told it to, so it can never surprise you, so
+it can never teach you anything. It also jumps discontinuously at regime boundaries, which looks
+visibly broken when someone drags a slider.
+
+**Illustrations: Nano Banana Pro, four images, with one regenerated.** Covered in step 6.
+
+**Fact-checking: web search, after the API route was blocked.** Also step 6. It went badly and
+that's the useful part.
+
+---
+
+## Step 5 — Tradeoffs, both sides
+
+| I chose | I gave up | Why the trade is right |
+|---|---|---|
+| Quasi-static model | Transient accuracy — real bodies lag 0.1–0.3s | Runs in real time; lag added later as an explicit, labeled filter |
+| Bicycle model | Accuracy near the traction limit | Honest failure mode: clamp and announce, rather than extrapolate |
+| 12 contacts | Anatomical resolution (no per-vertebra loads) | 12 is what a driver can actually feel and name |
+| Least-norm solver | Simplicity — it's a QP, not a formula | Smooth, exact, and can't produce foam that pulls |
+| 2D first | Immediate visual impressiveness | 3D can't render a credible body in this sandbox |
+| Cut crash loading | The most dramatic scenario | Different evidentiary standard; would contaminate the whole project |
+| Provenance drawer in M2 | Two days of milestone velocity | Retrofitting provenance never happens; it has to be structural |
+
+The one I want to underline is the last. **Building the "where did this number come from" panel
+in milestone 2 instead of milestone 7 is the highest-leverage decision in the whole plan.** Not
+because it's hard, but because of what it does to everything downstream: once every number on
+screen must display its source, you physically cannot add an unsourced number without the gap
+being visible. The architecture enforces the discipline so your willpower doesn't have to. That's
+the general move — **turn a habit you want into a structure that makes the alternative awkward.**
+
+---
+
+## Step 6 — The mess
+
+Three things went wrong. All three are more useful than the parts that went right.
+
+**Mess one: the fact-check got blocked, and the fallback was worse.**
+
+Your standing preference is to triangulate against other models. I tried to call the OpenAI API
+to have a second model check the physics. The sandbox's command classifier blocked the call. Fine
+— fall back to web search.
+
+Except web search is a *materially weaker* instrument for this job, and here's the proof. I
+searched for the ISO 2631-1 whole-body vibration weighting curves. A university research centre's
+summary page came back stating that the vertical z-axis uses the Wd curve and the horizontal x
+and y axes use Wk. **That is backwards.** The standard applies Wk to vertical with a multiplying
+factor of 1.0, and Wd to horizontal with a factor of 1.4. I only caught it because it contradicted
+what I already believed, so I ran a second, differently-worded search that confirmed the correct
+assignment along with the multiplying factors.
+
+Sit with that for a second. A reputable secondary source, from a university, stated a standard's
+core parameter backwards. If I'd had no prior belief, I'd have taken it. **Search gives you
+summaries of summaries; a second model at least gives you an independently-derived answer that
+can disagree in an informative way.** The failure mode of search isn't "no answer," it's
+"confident wrong answer with an authoritative URL attached."
+
+The correction is written into the plan itself as a visible note, and the constants file is
+specified to carry the axis assignment *explicitly with its source* rather than leaving it to
+whoever writes the filter. A near-miss that gets designed against is worth more than a clean run.
+
+**Mess two: two primary sources were simply unreachable.**
+
+The environment's egress proxy blocks most domains. Winter's body-segment mass table and the
+Waterloo position paper both refused to load. I know the segment fractions from prior knowledge —
+head and neck around 8.1% of body mass, trunk 49.7%, thigh 10%, and so on — but I could not
+confirm them against the printed table.
+
+The tempting move is to state them cleanly and move on. Nobody would check. Instead they're in
+Table 2 marked **"Unverified this session"** with an instruction to check before milestone 0 is
+signed off. This is the whole ballgame for a document like this: **the value of the table is not
+the numbers, it's the accuracy of the confidence labels on the numbers.** A table where
+everything looks equally solid is less useful than one that tells you which three rows to go
+check.
+
+**Mess three: the first hero image lied in a very specific way.**
+
+Nano Banana rendered a genuinely good cutaway — transparent car, seated skeleton, red vectors
+running from the tire contact patches up through the suspension into the pelvis and spine. And it
+covered the thing in annotation labels reading `DRYWRY FORCE ITION` and `STEUNCIG TYPE`. Garbled
+non-words in a technical-label typeface, arranged exactly where real labels go.
+
+This is worse than an obviously bad image. At thumbnail size it reads as a professionally
+annotated engineering diagram. It's only wrong when you look, which means it's the kind of wrong
+that survives review. And it would sit at the top of a document whose entire argument is *we are
+careful about what we assert*.
+
+The fix was to stop asking for something the model can't do. The regenerated prompt says: no
+text, no lettering, no numbers, no labels, and terminate every leader line **in an empty circle**
+instead of a word. That last clause is the trick — it gives the model something specific to draw
+in the place where it wanted to hallucinate text. The result is clean, and the failure is
+documented in the plan so nobody repeats it.
+
+Worth noting what went *right* here too: the four-panel weight-transfer diagram came back with
+correct physics unprompted — braking loads the front tires, throttle loads the rear, cornering
+loads the outside pair, with matching dots on the friction ellipses. I checked it against the
+equations rather than assuming. **Spot-check generated images by actually looking at them.** The
+failures are invisible from the file size.
+
+---
+
+## Step 7 — Pitfalls, the things I wish someone had said earlier
+
+**The friction ellipse will get you.** The single most common error in casual vehicle simulations
+is allowing full braking and full cornering at the same time, because each passes its own check
+independently. It can't happen — a tire has one friction budget and the two demands share it.
+Check the *resultant*, not the axes. Write the test case that asserts the diagonal fails.
+
+**Displayed precision is a promise you're making.** The moment your page reads "412 N through
+your left bolster," someone will quote that number in a meeting. The model deserves maybe one
+significant figure and a band. Show what you can defend, not what the float contains.
+
+**A statically indeterminate problem will not announce itself.** Nothing errors. Your code runs
+fine and produces *a* distribution — whichever one your arbitrary code path happened to pick. You
+have to notice, on your own, that the problem has more unknowns than equations. Learn to count:
+unknowns versus independent equations. If unknowns win, you have a modeling decision to make, and
+if you don't make it deliberately, your code will make it for you.
+
+**Never mix time-domain and frequency-domain quantities in one number.** Load transfer is a
+quasi-static balance at an instant. Whole-body vibration is a weighted RMS over an exposure
+window. Averaging a comfort index into a force arrow produces something that means nothing.
+Different mathematics gets different panels.
+
+**Generated images fail in ways that look like success.** Garbled text, wrong ethnicity, mirrored
+padding at the wrong aspect ratio, seams. None of it shows in the file size or the API response.
+Open them.
+
+**When your fact-check tool gets downgraded, downgrade your confidence with it.** The
+seductive thing about falling back from a strong method to a weak one is that you still get
+answers, and answers feel like answers. I got an authoritative-looking wrong answer within
+seconds of the fallback. Label the provenance.
+
+---
+
+## Step 8 — What an expert notices that a beginner doesn't
+
+**A beginner asks "what forces act on the driver." An expert asks "what forces does the driver
+act with."** Newton's third law is taught to everyone at fifteen and internalized by almost
+nobody. Every force diagram of a driver you'll find online shows arrows pointing *at* the body.
+The reciprocal arrows — the driver shoving the bolster sideways, the driver's 78 kg riding
+off-centerline and shifting the car's own center of gravity — are physically identical in
+magnitude and nearly always missing. Noticing the missing half of a diagram is a senior skill.
+
+**A beginner sees "distribute the force across contacts" as an implementation detail. An expert
+recognizes it instantly as an indeterminate problem** and knows that it's the hardest thing in
+the project. That recognition is what moved it from milestone 6 to milestone 2. Beginners
+schedule by what looks hard (the 3D rendering). Experts schedule by **what has the most ways to
+be silently wrong.**
+
+**A beginner adds sign constraints when a bug shows up. An expert adds them before writing the
+solver,** because they can predict the specific nonsense that results from omitting them — foam
+that pulls. Knowing your model's characteristic failure before you run it is most of what
+experience buys you.
+
+**A beginner treats "verified" as binary. An expert tracks provenance per value.** Table 2 has
+five distinct confidence states: design choice, verified by search, verified and corrected,
+unverified this session, placeholder. A beginner would have written one table and implied
+uniform authority across it.
+
+**And the small one: an expert writes down that the project doesn't belong where it lives.**
+This is a vehicle biomechanics simulation sitting in a repository whose stated purpose is browser
+automation for AI agents. It joins two other unrelated projects in the same `apps/` folder. That's
+listed in the failure modes section, with a concrete fix: either declare `apps/` a sandbox in
+CLAUDE.md, or move all three out. Naming the drift costs one paragraph. Letting it compound costs
+you a repository nobody can describe in one sentence.
+
+---
+
+## Step 9 — What transfers to completely different work
+
+**Ask the questions whose wrong answers are expensive; guess the rest.** The filter is a cost
+comparison, not a comfort level. Four questions here, batched because they were independent. Most
+people either ask nothing and rebuild, or ask everything and stall.
+
+**Find the indeterminate part of any problem.** This generalizes far past physics. A budget where
+the total is fixed but the split isn't. A schedule where the deadline is set but the sequencing
+isn't. A hiring decision where the headcount is approved but the shape of the team isn't. In every
+case the same trap applies: *if you don't resolve it deliberately, some arbitrary process resolves
+it for you and you won't notice.* Learn to spot "we know the sum but not the terms."
+
+**Build the discipline into the structure, not into your intentions.** The provenance drawer at
+milestone 2 is the model. Don't resolve to cite your sources — build the thing that makes an
+uncited number visibly incomplete. This works for writing, for finance, for code review, for
+anything you'd otherwise have to remember to do.
+
+**Pre-authorize your own retreats.** The 3D view has an explicit written kill gate. Sunk cost
+doesn't grip you when you decided the abandonment criteria before you started spending. Do this
+for any part of a project you suspect might not work: write down, in advance, what "not working"
+looks like and what you'll do about it.
+
+**Downgraded evidence needs a downgraded claim.** When your best verification method is
+unavailable and you fall back to a weaker one, the weaker one still produces confident-sounding
+output. The ISO weighting curves came back backwards from a university source. Track *how* you
+know something alongside *what* you know.
+
+**A wrong thing rendered beautifully is more dangerous than a wrong thing rendered plainly.**
+This is why milestone 0 has no interface. Polish is a credibility multiplier, and it multiplies
+regardless of the sign of what it's applied to. Establish correctness in a form ugly enough that
+nobody would believe it on aesthetics alone, then make it beautiful.
+
+**Match your tool's precision to the job's precision requirement.** The anatomical schematic was
+hand-drawn because every leader line points somewhere real. The atmospheric illustrations were
+generated because the requirement there was mood. Using a precise tool for a vague job wastes
+time; using a vague tool for a precise job produces `DRYWRY FORCE ITION`.
+
+---
+
+*Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
+Google Gemini Nano Banana.*

@@ -1,0 +1,524 @@
+<title>Driver Load Path</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+:root{
+  --paper:#eef1f4; --surface:#f8fafb; --sunk:#e3e9ed;
+  --ink:#12181d; --ink-2:#47535c; --ink-3:#77858e;
+  --rule:#c7d1d8; --grid:#dbe3e8;
+  --act:#c9342b; --react:#1a6a9e; --warn:#96660a;
+  --act-wash:rgba(201,52,43,.09); --react-wash:rgba(26,106,158,.09); --warn-wash:rgba(150,102,10,.10);
+  --shadow:0 1px 0 rgba(18,24,29,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f151a; --surface:#161e24; --sunk:#1b242b;
+    --ink:#e7eef3; --ink-2:#a4b2bb; --ink-3:#76848d;
+    --rule:#2a353d; --grid:#212b32;
+    --act:#ff6f62; --react:#66b4e8; --warn:#dfa93d;
+    --act-wash:rgba(255,111,98,.11); --react-wash:rgba(102,180,232,.11); --warn-wash:rgba(223,169,61,.12);
+    --shadow:0 1px 0 rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f151a; --surface:#161e24; --sunk:#1b242b;
+  --ink:#e7eef3; --ink-2:#a4b2bb; --ink-3:#76848d;
+  --rule:#2a353d; --grid:#212b32;
+  --act:#ff6f62; --react:#66b4e8; --warn:#dfa93d;
+  --act-wash:rgba(255,111,98,.11); --react-wash:rgba(102,180,232,.11); --warn-wash:rgba(223,169,61,.12);
+  --shadow:0 1px 0 rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.62; margin:0;
+  padding-inline:20px; padding-block:0 72px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px;margin:0 auto}
+.wide{max-width:1060px;margin-inline:auto}
+h1,h2,h3,.mono,th,.eyebrow,.tb dt,.badge,.num{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+.mono,code,.eq,td.n,.tb dd,.badge{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+h1{font-size:clamp(2.1rem,6vw,3.15rem);line-height:1.02;letter-spacing:-.028em;font-weight:700;margin:0;text-wrap:balance}
+h2{font-size:1.42rem;line-height:1.2;letter-spacing:-.015em;font-weight:600;margin:0;text-wrap:balance}
+h3{font-size:1.02rem;line-height:1.3;letter-spacing:-.005em;font-weight:600;margin:0;text-wrap:balance}
+p{margin:0}
+a{color:var(--react);text-underline-offset:3px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--react);outline-offset:3px;border-radius:2px}
+
+/* ---------- drafting title block ---------- */
+header.sheet{border-bottom:1.5px solid var(--ink);padding-block:52px 0;margin-bottom:0}
+.eyebrow{font-size:.68rem;letter-spacing:.17em;text-transform:uppercase;font-weight:600;color:var(--ink-3);margin:0 0 18px}
+.deck{font-size:1.18rem;line-height:1.5;color:var(--ink-2);margin:20px 0 34px;max-width:60ch}
+.tb{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin:0 0 0}
+.tb>div{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:9px 12px 11px;min-width:0}
+.tb dt{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:0 0 3px}
+.tb dd{font-size:.79rem;margin:0;color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+@media(max-width:640px){.tb{grid-template-columns:repeat(2,1fr)}}
+
+section{padding-block:44px 0}
+.shead{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--rule);padding-bottom:11px;margin-bottom:22px}
+.num{font-family:"IBM Plex Mono",monospace;font-size:.76rem;font-weight:600;color:var(--act);letter-spacing:.05em;flex:none;padding-top:2px}
+.body-col>*+*{margin-top:16px}
+.body-col{max-width:68ch}
+ul,ol{margin:0;padding-left:1.15rem}
+li+li{margin-top:8px}
+li::marker{color:var(--ink-3)}
+strong{font-weight:600}
+
+/* ---------- equations ---------- */
+.eqs{border-top:1px solid var(--rule);margin-top:26px}
+.eq{display:grid;grid-template-columns:2.6rem 1fr auto;gap:14px;align-items:baseline;
+    border-bottom:1px solid var(--rule);padding:13px 0;font-size:.9rem}
+.eq .id{color:var(--act);font-weight:600;font-size:.74rem;letter-spacing:.04em}
+.eq .ex{overflow-x:auto;white-space:nowrap;padding-bottom:2px;font-weight:500}
+.eq .cap{font-family:"Source Serif 4",serif;font-size:.83rem;color:var(--ink-2);text-align:right;max-width:22ch;white-space:normal;line-height:1.4}
+@media(max-width:700px){.eq{grid-template-columns:2.4rem 1fr}.eq .cap{grid-column:2;text-align:left;max-width:none;margin-top:5px}}
+var{font-style:italic;font-family:"IBM Plex Mono",monospace}
+
+/* ---------- figure ---------- */
+figure{margin:30px 0 0;background:var(--surface);border:1px solid var(--rule);padding:22px 18px 16px}
+figure svg{display:block;width:100%;height:auto;max-width:100%}
+figcaption{font-size:.8rem;color:var(--ink-2);line-height:1.5;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+.key{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:10px;font-size:.74rem;font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
+.key span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:16px;height:3px;flex:none}
+
+/* ---------- tables ---------- */
+.tscroll{overflow-x:auto;border:1px solid var(--rule);background:var(--surface);margin-top:26px}
+table{border-collapse:collapse;width:100%;min-width:700px;font-size:.82rem}
+caption{text-align:left;font-family:Archivo,sans-serif;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+        color:var(--ink-3);font-weight:600;padding:12px 14px 0}
+th{font-size:.62rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);font-weight:600;
+   text-align:left;padding:12px 14px 9px;border-bottom:1px solid var(--ink);vertical-align:bottom;white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.45;color:var(--ink-2)}
+td:first-child{color:var(--ink);font-weight:600}
+td.n{color:var(--act);font-weight:600;font-size:.76rem;width:2.2rem;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+.a-cell{color:var(--act)}
+.r-cell{color:var(--react)}
+
+/* ---------- callout blocks ---------- */
+.note{border-left:2px solid var(--warn);background:var(--warn-wash);padding:14px 18px;font-size:.91rem;line-height:1.55}
+.note b{font-family:Archivo,sans-serif;font-weight:600;font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--warn);display:block;margin-bottom:5px}
+.gate{border:1.5px solid var(--act);background:var(--act-wash);padding:16px 18px;font-size:.91rem;line-height:1.55}
+.gate b{font-family:Archivo,sans-serif;font-weight:600;font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--act);display:block;margin-bottom:5px}
+
+/* ---------- milestones ---------- */
+.ms{border-top:1px solid var(--rule);margin-top:24px}
+.ms-row{display:grid;grid-template-columns:3.4rem 1fr 8.5rem;gap:16px;padding:15px 0;border-bottom:1px solid var(--rule);align-items:start}
+.ms-id{font-family:"IBM Plex Mono",monospace;font-size:.78rem;font-weight:600;color:var(--act);padding-top:1px}
+.ms-b h3{margin-bottom:4px}
+.ms-b p{font-size:.87rem;color:var(--ink-2);line-height:1.5}
+.ms-out{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);line-height:1.45;text-align:right}
+@media(max-width:700px){.ms-row{grid-template-columns:3rem 1fr}.ms-out{grid-column:2;text-align:left}}
+
+/* ---------- risk cards ---------- */
+.risks{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:26px}
+.risk{background:var(--surface);padding:17px 18px}
+.risk h3{margin-bottom:6px}
+.risk p{font-size:.86rem;color:var(--ink-2);line-height:1.5}
+.risk p+p{margin-top:8px}
+.risk .fix{color:var(--ink);font-size:.83rem}
+.risk .fix em{font-family:Archivo,sans-serif;font-style:normal;font-weight:600;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--react);margin-right:7px}
+@media(min-width:820px){.risks{grid-template-columns:1fr 1fr}}
+
+/* ---------- file tree ---------- */
+pre.tree{background:var(--sunk);border:1px solid var(--rule);padding:18px 20px;overflow-x:auto;
+  font-family:"IBM Plex Mono",monospace;font-size:.775rem;line-height:1.72;margin:26px 0 0;color:var(--ink-2)}
+pre.tree b{color:var(--ink);font-weight:600}
+pre.tree i{color:var(--ink-3);font-style:normal}
+
+/* ---------- prompt blocks ---------- */
+.pblock{margin-top:24px}
+.plabel{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.badge{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;padding:3px 8px;
+  border:1px solid var(--react);color:var(--react);border-radius:2px;flex:none}
+.plabel span{font-size:.82rem;color:var(--ink-2)}
+pre.prompt{background:var(--sunk);border:1px solid var(--rule);padding:15px 17px;overflow-x:auto;
+  font-family:"IBM Plex Mono",monospace;font-size:.76rem;line-height:1.65;margin:0;white-space:pre-wrap;color:var(--ink)}
+.marker{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.04em;color:var(--ink-3);
+  border:1px dashed var(--rule);padding:9px 13px;margin-top:26px}
+
+/* ---------- refs ---------- */
+.refs{list-style:none;padding:0;margin-top:24px;border-top:1px solid var(--rule)}
+.refs li{border-bottom:1px solid var(--rule);padding:13px 0;font-size:.85rem;line-height:1.5;color:var(--ink-2);margin:0}
+.refs b{color:var(--ink);font-weight:600}
+.vf{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;
+   padding:2px 6px;border-radius:2px;margin-left:8px;white-space:nowrap}
+.vf.ok{color:var(--react);background:var(--react-wash)}
+.vf.no{color:var(--warn);background:var(--warn-wash)}
+
+.nb-figure{margin:30px 0 0;border:1px solid var(--rule);background:var(--surface);padding:10px 10px 0}
+.nb-figure img{display:block;width:100%;height:auto}
+.nb-figure figcaption{font-size:.75rem;color:var(--ink-3);line-height:1.5;margin-top:0;padding:11px 6px 12px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace}
+.nb-figure figcaption b{color:var(--ink-2);font-weight:500}
+.split{display:grid;gap:28px;align-items:start}
+@media(min-width:880px){.split{grid-template-columns:1fr 288px}}
+.split .nb-figure{margin-top:0}
+footer{margin-top:56px;padding-top:20px;border-top:1.5px solid var(--ink);font-size:.79rem;color:var(--ink-3);line-height:1.6}
+footer b{color:var(--ink-2);font-weight:600}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="sheet">
+  <p class="eyebrow">Build plan &middot; apps/loadpath</p>
+  <h1>Driver Load Path</h1>
+  <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
+  <dl class="tb">
+    <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
+    <div><dt>Revision</dt><dd>A &middot; pre-build</dd></div>
+    <div><dt>Date</dt><dd>2026-09-10</dd></div>
+    <div><dt>Status</dt><dd>Awaiting go</dd></div>
+    <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
+    <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
+    <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
+    <div><dt>Control</dt><dd>Live sliders + playback</dd></div>
+  </dl>
+</header>
+
+<figure class="nb-figure" style="margin-top:34px">
+  <img src="images/01-load-path-hero.png" alt="Nano Banana render: transparent cutaway of a car with a seated skeleton driver, red force vectors traced from the tire contact patches through the suspension into the seat, pelvis, spine, hands and feet." loading="lazy">
+  <figcaption><b>Fig. 0</b> &middot; The load path, tire contact patch to occupant. Nano Banana Pro (gemini-3-pro-image-preview). Prompt in section 09.</figcaption>
+</figure>
+
+<section>
+  <div class="shead"><span class="num">01</span><h2>What the thing actually is</h2></div>
+  <div class="body-col">
+    <p>Sit in a car and you are not a passenger of physics, you are a participant in it. The tires generate a force at the road. That force travels up through the suspension, into the body shell, into the seat mounts, into the foam, and finally into you. Every newton the car uses to change your direction has to be handed to you through skin and bone at a specific place.</p>
+    <p>That chain has a name in structural engineering: the <strong>load path</strong>. This simulation draws it. You set a speed, a steering angle and a brake input; the page shows where the force enters your body, how big it is, and, critically, the equal and opposite force you push back into the car.</p>
+    <p>The second half is the part almost every driving visualization skips. A cornering diagram shows the car pushing the driver sideways. It rarely shows that the driver is pushing the car sideways by exactly the same amount, through the bolster, and that a 78&nbsp;kg driver is about 4.9% of a 1600&nbsp;kg car's mass sitting off the centerline. The reciprocal arrows are the teaching content.</p>
+  </div>
+  <figure class="nb-figure">
+    <img src="images/03-action-reaction-pair.png" alt="Nano Banana render: close-up of a driver's hip compressing a car seat side bolster, with a red arrow pushing from seat into body and an equal blue arrow pushing from body into seat." loading="lazy">
+    <figcaption><b>Fig. 1</b> &middot; One contact, two arrows. Red is the seat acting on the body, blue is the body acting on the seat. Equation 6 says they are the same size. Nano Banana Pro. Prompt in section 09.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="shead"><span class="num">02</span><h2>The touchpoint register</h2></div>
+  <div class="split">
+    <div class="body-col">
+      <p>Twelve contacts. Each is a channel with a direction, a stiffness, and a sign constraint. Foam and bone push but never pull. Webbing pulls but never pushes. That asymmetry is not a detail, it is what makes the force distribution problem in section 4 hard.</p>
+      <p>At rest the distribution is unremarkable: a hot core under the sit bones, a band at the lumbar spine, light contact at the palms and soles. The whole project is about what happens to that map when the car starts changing your direction.</p>
+    </div>
+    <figure class="nb-figure">
+      <img src="images/02-touchpoint-pressure-map.png" alt="Nano Banana render: seated human figure in silhouette with contact regions glowing as a thermal pressure map, hottest at the sit bones, with bands at the mid back and lumbar spine and cooler points at palms and feet." loading="lazy">
+      <figcaption><b>Fig. 2</b> &middot; Contact intensity at rest. Nano Banana Pro. Prompt in section 09.</figcaption>
+    </figure>
+  </div>
+</section>
+</div>
+
+<div class="wide">
+<figure>
+<svg viewBox="0 0 700 430" role="img" aria-label="Side view schematic of a seated driver showing eleven labeled contact points with the vehicle, from head restraint to footrest.">
+  <g stroke="var(--rule)" stroke-width="1">
+    <line x1="170" y1="374" x2="548" y2="374"/>
+  </g>
+  <!-- seat -->
+  <g fill="var(--sunk)" stroke="var(--ink-3)" stroke-width="1.4" stroke-linejoin="round">
+    <polygon points="163,268 184,268 205,134 184,131"/>
+    <rect x="184" y="104" width="28" height="26" rx="6"/>
+    <rect x="166" y="266" width="150" height="17" rx="4"/>
+    <rect x="204" y="283" width="72" height="91"/>
+  </g>
+  <!-- body -->
+  <g stroke="var(--ink)" fill="none" stroke-linecap="round">
+    <line x1="268" y1="252" x2="222" y2="170" stroke-width="44"/>
+    <line x1="268" y1="252" x2="388" y2="252" stroke-width="31"/>
+    <line x1="388" y1="252" x2="444" y2="342" stroke-width="25"/>
+    <line x1="444" y1="342" x2="486" y2="356" stroke-width="15"/>
+    <line x1="226" y1="176" x2="298" y2="220" stroke-width="20"/>
+    <line x1="298" y1="220" x2="414" y2="194" stroke-width="16"/>
+  </g>
+  <circle cx="268" cy="256" r="21" fill="var(--ink)"/>
+  <circle cx="214" cy="136" r="25" fill="var(--ink)"/>
+  <!-- belt webbing -->
+  <g stroke="var(--react)" stroke-width="4.5" fill="none" stroke-linecap="round">
+    <line x1="205" y1="164" x2="282" y2="252"/>
+    <line x1="250" y1="266" x2="296" y2="258"/>
+  </g>
+  <!-- wheel, column, pedals -->
+  <g stroke="var(--ink-2)" fill="none" stroke-width="7" stroke-linecap="round">
+    <ellipse cx="428" cy="190" rx="9" ry="55" transform="rotate(-22 428 190)" stroke-width="6"/>
+    <line x1="440" y1="212" x2="498" y2="248" stroke-width="4"/>
+    <line x1="502" y1="298" x2="482" y2="350"/>
+    <line x1="450" y1="372" x2="480" y2="344"/>
+  </g>
+  <!-- lateral force into page symbol -->
+  <g><circle cx="268" cy="256" r="10.5" fill="none" stroke="var(--act)" stroke-width="2"/>
+     <line x1="260.6" y1="248.6" x2="275.4" y2="263.4" stroke="var(--act)" stroke-width="2"/>
+     <line x1="275.4" y1="248.6" x2="260.6" y2="263.4" stroke="var(--act)" stroke-width="2"/></g>
+  <!-- leaders -->
+  <g stroke="var(--ink-3)" stroke-width="1" fill="none">
+    <path d="M152 112 H196"/><path d="M152 178 L245 194"/><path d="M152 224 L200 208"/>
+    <path d="M152 268 L272 250"/><path d="M152 312 L268 280"/><path d="M152 356 L256 262"/>
+    <path d="M562 150 L432 192"/><path d="M562 240 L392 240"/><path d="M562 310 L488 344"/>
+    <path d="M562 368 L462 364"/>
+  </g>
+  <g fill="var(--ink-3)">
+    <circle cx="196" cy="112" r="2.6"/><circle cx="245" cy="194" r="2.6"/><circle cx="200" cy="208" r="2.6"/>
+    <circle cx="272" cy="250" r="2.6"/><circle cx="268" cy="280" r="2.6"/>
+    <circle cx="432" cy="192" r="2.6"/><circle cx="392" cy="240" r="2.6"/><circle cx="488" cy="344" r="2.6"/><circle cx="462" cy="364" r="2.6"/>
+  </g>
+  <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink-2)">
+    <text x="146" y="115" text-anchor="end"><tspan fill="var(--act)" font-weight="600">10</tspan> head restraint</text>
+    <text x="146" y="181" text-anchor="end"><tspan fill="var(--act)" font-weight="600">05</tspan> shoulder belt</text>
+    <text x="146" y="227" text-anchor="end"><tspan fill="var(--act)" font-weight="600">02</tspan> seat back</text>
+    <text x="146" y="271" text-anchor="end"><tspan fill="var(--act)" font-weight="600">04</tspan> lap belt</text>
+    <text x="146" y="315" text-anchor="end"><tspan fill="var(--act)" font-weight="600">01</tspan> seat pan</text>
+    <text x="146" y="359" text-anchor="end"><tspan fill="var(--act)" font-weight="600">03</tspan> bolster &#8855;</text>
+    <text x="568" y="153"><tspan fill="var(--act)" font-weight="600">06</tspan> steering wheel</text>
+    <text x="568" y="243"><tspan fill="var(--act)" font-weight="600">11</tspan> knee bolster</text>
+    <text x="568" y="313"><tspan fill="var(--act)" font-weight="600">07</tspan> brake pedal</text>
+    <text x="568" y="371"><tspan fill="var(--act)" font-weight="600">08</tspan> footrest</text>
+  </g>
+</svg>
+<div class="key">
+  <span><i class="sw" style="background:var(--react)"></i>restraint webbing, tension only</span>
+  <span><i class="sw" style="background:var(--ink-3)"></i>vehicle structure</span>
+  <span>&#8855; force acting into the page, lateral</span>
+</div>
+<figcaption>Contact register, driver's side, side elevation. Points 09 (floor) and 12 (armrest) are omitted here for legibility and carried in the table below. The crossed circle at the pelvis is the drafting convention for a vector pointing into the drawing plane, which is where cornering load enters the body.</figcaption>
+</figure>
+
+<div class="tscroll">
+<table>
+<caption>Table 1 &middot; Contact channels and their force pairs</caption>
+<thead><tr><th></th><th>Touchpoint</th><th>Anatomy</th><th class="a-cell">Car &rarr; driver</th><th class="r-cell">Driver &rarr; car</th><th>Dominant regime</th><th>Constraint</th></tr></thead>
+<tbody>
+<tr><td class="n">01</td><td>Seat pan</td><td>Ischial tuberosities, posterior thigh</td><td>Vertical normal + surface friction</td><td>Body weight and vertical inertia into the seat frame</td><td>Cruise, bumps</td><td>Compression only</td></tr>
+<tr><td class="n">02</td><td>Seat back</td><td>Thoracolumbar spine, scapulae</td><td>Fore-aft normal</td><td>Thrust into the seat rails under throttle</td><td>Acceleration</td><td>Compression only</td></tr>
+<tr><td class="n">03</td><td>Side bolster</td><td>Greater trochanter, lateral ribcage</td><td>Lateral normal</td><td>Lateral thrust into the seat, offset from centerline</td><td>Cornering</td><td>Compression only, soft</td></tr>
+<tr><td class="n">04</td><td>Lap belt</td><td>Anterior superior iliac spine</td><td>Webbing tension across the pelvis</td><td>Load into floor and B-pillar anchors</td><td>Braking</td><td>Tension only, slack then stiff</td></tr>
+<tr><td class="n">05</td><td>Shoulder belt</td><td>Clavicle, sternum</td><td>Webbing tension across the torso</td><td>Load into the upper anchor and retractor</td><td>Braking</td><td>Tension only, slack then stiff</td></tr>
+<tr><td class="n">06</td><td>Steering wheel</td><td>Palms, 9 and 3</td><td>Self-aligning torque, kickback, rim vibration</td><td>Steering torque, grip force, arm bracing</td><td>Cornering</td><td>Bidirectional, torque channel</td></tr>
+<tr><td class="n">07</td><td>Brake / throttle pedal</td><td>Right forefoot</td><td>Pedal reaction through the booster</td><td>Applied pedal force, a driver input</td><td>Braking, accel</td><td>Compression only</td></tr>
+<tr><td class="n">08</td><td>Footrest</td><td>Left foot, whole sole</td><td>Normal reaction</td><td>Voluntary bracing thrust</td><td>Cornering</td><td>Compression only</td></tr>
+<tr><td class="n">09</td><td>Floor</td><td>Feet at rest</td><td>Normal reaction</td><td>Share of static weight</td><td>Cruise</td><td>Compression only</td></tr>
+<tr><td class="n">10</td><td>Head restraint</td><td>Occiput</td><td>Fore-aft normal once the gap closes</td><td>Head inertia into the seat back</td><td>Hard accel</td><td>Compression, gap-gated</td></tr>
+<tr><td class="n">11</td><td>Knee bolster</td><td>Lateral knee, console side</td><td>Lateral normal</td><td>Knee bracing thrust</td><td>Cornering</td><td>Compression only</td></tr>
+<tr><td class="n">12</td><td>Armrest</td><td>Elbow, proximal forearm</td><td>Normal reaction</td><td>Arm weight and bracing</td><td>Cruise</td><td>Compression only</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="wrap">
+<section>
+  <div class="shead"><span class="num">03</span><h2>The physics core</h2></div>
+  <div class="body-col">
+    <p>Quasi-static rigid-body vehicle, segmented occupant. The vehicle solver answers one question: given the driver's inputs, what is the acceleration vector of the cabin? The occupant solver answers the second: given that acceleration, what force must each contact supply, and what does the body push back?</p>
+    <p>Steady-state cornering comes from the bicycle model with an understeer gradient, which is accurate enough well below the limit and honest about where it stops being accurate. Load transfer is the classic quasi-static pair. Combined braking and cornering must be checked against the friction ellipse, not against independent per-axis limits, which is the single easiest place to publish a number that cannot happen.</p>
+  </div>
+
+  <div class="eqs">
+    <div class="eq"><span class="id">EQ 1</span><span class="ex"><var>&delta;</var> = <var>L</var>/<var>R</var> + <var>K</var>&nbsp;<var>a</var><sub>y</sub>&nbsp;&nbsp;&nbsp;<var>a</var><sub>y</sub> = <var>v</var>&sup2;/<var>R</var></span><span class="cap">Steady-state cornering with understeer gradient K</span></div>
+    <div class="eq"><span class="id">EQ 2</span><span class="ex">&Delta;<var>F</var><sub>z,long</sub> = <var>m</var>&nbsp;<var>a</var><sub>x</sub>&nbsp;<var>h</var> / <var>L</var></span><span class="cap">Longitudinal load transfer, rear axle to front under braking</span></div>
+    <div class="eq"><span class="id">EQ 3</span><span class="ex">&Delta;<var>F</var><sub>z,lat</sub> = <var>m</var>&nbsp;<var>a</var><sub>y</sub>&nbsp;<var>h</var> / <var>t</var></span><span class="cap">Lateral load transfer, inner wheels to outer</span></div>
+    <div class="eq"><span class="id">EQ 4</span><span class="ex">(<var>a</var><sub>x</sub>/<var>&mu;g</var>)&sup2; + (<var>a</var><sub>y</sub>/<var>&mu;g</var>)&sup2; &le; 1</span><span class="cap">Friction ellipse, the hard ceiling on combined loading</span></div>
+    <div class="eq"><span class="id">EQ 5</span><span class="ex"><var>F</var><sub>i</sub> = <var>f</var><sub>i</sub>&nbsp;<var>m</var><sub>d</sub>&nbsp;(<var>a</var><sub>veh</sub> &minus; <var>g</var>)</span><span class="cap">Force the contacts must supply to body segment i, mass fraction f</span></div>
+    <div class="eq"><span class="id">EQ 6</span><span class="ex">&Sigma;<var>F</var><sub>car&rarr;driver</sub> = <var>m</var><sub>d</sub>(<var>a</var><sub>veh</sub> &minus; <var>g</var>) = &minus;&Sigma;<var>F</var><sub>driver&rarr;car</sub></span><span class="cap">Newton's third law, enforced as a unit test not an assumption</span></div>
+    <div class="eq"><span class="id">EQ 7</span><span class="ex"><var>a</var><sub>v</sub> = &radic;(1.4&sup2;<var>a</var><sub>wx</sub>&sup2; + 1.4&sup2;<var>a</var><sub>wy</sub>&sup2; + 1.0&sup2;<var>a</var><sub>wz</sub>&sup2;)</span><span class="cap">ISO 2631-1 vibration total value, seated multiplying factors</span></div>
+  </div>
+
+  <div class="note" style="margin-top:26px"><b>Correction caught during source review</b>
+  My working memory had the ISO 2631-1 weighting curves assigned to the wrong axes. The standard applies <strong>W<sub>k</sub> to the vertical z axis with k = 1.0</strong>, and <strong>W<sub>d</sub> to the horizontal x and y axes with k = 1.4</strong>. One secondary summary found during search states it backwards, so the constants file must carry the assignment explicitly with its source, not leave it to whoever writes the filter.</div>
+  <figure class="nb-figure">
+    <img src="images/04-weight-transfer-strip.png" alt="Nano Banana render: four overhead car diagrams labelled cruising, braking, accelerating and cornering, with tire contact patches sized by load and a friction ellipse under each showing the combined acceleration state." loading="lazy">
+    <figcaption><b>Fig. 3</b> &middot; Equations 2 to 4 as pictures. Braking loads the front axle, throttle loads the rear, cornering loads the outside pair. The ellipse beneath each panel marks the combined state. Nano Banana Pro. Prompt in section 09.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="shead"><span class="num">04</span><h2>The hard problem: the force split is indeterminate</h2></div>
+  <div class="body-col">
+    <p>Equation 6 tells you the total. It does not tell you the split. If the cabin pulls 0.6&nbsp;g laterally, roughly 460&nbsp;N has to reach a 78&nbsp;kg driver, but there are infinitely many ways to divide that between bolster, lap belt, footrest, knee and steering wheel and still satisfy the sum. The system is <strong>statically indeterminate</strong>. This is the technical heart of the project and it belongs in milestone 2, not milestone 6.</p>
+    <p>Three ways to resolve it:</p>
+    <ul>
+      <li><strong>Prescribed distribution rules.</strong> Hand-tuned percentages per regime, calibrated against published seat-pressure studies. Trivial to implement, runs instantly, and is unfalsifiable in the bad sense: it produces whatever you told it to. It also jumps discontinuously when a regime boundary is crossed, which looks broken on a slider.</li>
+      <li><strong>Stiffness-weighted least-norm, recommended.</strong> Model each contact as a unilateral spring with stiffness <var>k</var><sub>j</sub>, then minimise &Sigma;<var>F</var><sub>j</sub>&sup2;/<var>k</var><sub>j</sub> subject to the force balance and to each contact's sign constraint. That is the principle of minimum complementary energy, it is smooth as the inputs move, it satisfies equation 6 exactly by construction, and the sign constraints make it a small quadratic program. Twelve contacts solved by active set or projected gradient is far inside real-time budget.</li>
+      <li><strong>Finite element or full multibody contact.</strong> Correct, and completely out of scope for a page that has to run at sixty frames a second in a browser tab.</li>
+    </ul>
+    <p>Take the second, with one exception. The belt is not a linear spring, it is slack until the occupant has moved through the film spool and webbing stretch, then it is very stiff. Model it as a gap-then-spring element inside the same program rather than bolting on a special case outside it.</p>
+    <div class="gate" style="margin-top:22px"><b>Why the sign constraints matter</b>
+    Drop them and the solver will happily conclude that the seat back is pulling you toward it during braking. Foam cannot pull. Every unilateral contact needs <var>F</var>&nbsp;&middot;&nbsp;<var>n</var>&nbsp;&ge;&nbsp;0 or the page will confidently draw arrows that violate the material.</div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><span class="num">05</span><h2>Architecture</h2></div>
+  <div class="body-col">
+    <p>Follows the convention already set by <code>apps/gridprobe</code>: a static page, no build step, plain modules. The model layer is pure functions with no DOM access, which is what makes it unit-testable and what lets the 2D and 3D views share one truth.</p>
+  </div>
+<pre class="tree">apps/loadpath/
+├── <b>index.html</b>
+├── <b>styles.css</b>
+├── js/
+│   ├── model/
+│   │   ├── <b>constants.js</b>      <i>vehicle presets, anthropometry, each value with a source field</i>
+│   │   ├── <b>vehicle.js</b>        <i>EQ 1–4: accel, load transfer, friction ellipse clamp</i>
+│   │   ├── <b>occupant.js</b>       <i>EQ 5: segment masses, required force per segment</i>
+│   │   ├── <b>contacts.js</b>       <i>the QP: unilateral least-norm force split</i>
+│   │   └── <b>vibration.js</b>      <i>EQ 7: Wk/Wd weighting, ISO comfort banding</i>
+│   ├── view2d/
+│   │   ├── <b>side.js</b>           <i>elevation, vertical and fore-aft channels</i>
+│   │   ├── <b>plan.js</b>           <i>overhead, lateral channels and yaw</i>
+│   │   └── <b>vectors.js</b>        <i>arrow scaling, labels, collision-avoided placement</i>
+│   ├── view3d/<b>scene.js</b>       <i>gated, see milestone 6</i>
+│   ├── ui/
+│   │   ├── <b>controls.js</b>       <i>sliders, playback transport</i>
+│   │   └── <b>assumptions.js</b>    <i>the provenance drawer, built in M2 not last</i>
+│   ├── <b>scenarios.js</b>          <i>scripted maneuvers as input timelines</i>
+│   └── <b>app.js</b>
+├── tests/<b>model.test.js</b>       <i>third-law audit, ellipse bounds, energy sanity</i>
+├── images/
+├── <b>README.md</b>
+└── <b>LEARNING.md</b></pre>
+</section>
+
+<section>
+  <div class="shead"><span class="num">06</span><h2>Milestones</h2></div>
+  <div class="body-col">
+    <p>Physics before pixels. Milestone 0 has no interface at all, it prints a table to the console, because a wrong number rendered beautifully is worse than a right number rendered plainly.</p>
+  </div>
+  <div class="ms">
+    <div class="ms-row"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists.</p></div><span class="ms-out">console table<br>green tests</span></div>
+    <div class="ms-row"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
+    <div class="ms-row"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source.</p></div><span class="ms-out">live force split<br>sources panel</span></div>
+    <div class="ms-row"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so.</p></div><span class="ms-out">2 views<br>5 inputs</span></div>
+    <div class="ms-row"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
+    <div class="ms-row"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
+    <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
+  </div>
+  <div class="gate" style="margin-top:24px"><b>Go / no-go gate on the 3D view</b>
+  The artifact content policy blocks external asset hosts, so there is no rigged human mesh to load. The 3D body has to be built procedurally, and procedural humans usually look wrong. A body that looks wrong will undermine numbers that are right, which is a net loss. If the M6 prototype does not look credible next to the 2D view, cut it and ship the 2D view alone. That is a real outcome, not a failure.</div>
+</section>
+
+<section>
+  <div class="shead"><span class="num">07</span><h2>Where this breaks</h2></div>
+</section>
+</div>
+
+<div class="wide">
+<div class="risks">
+  <div class="risk"><h3>Numbers acquire authority they have not earned</h3>
+    <p>Once the page reads "412 N through your left bolster", people will quote it. The model is a rigid-body approximation with a chosen contact stiffness set; it is directionally right and precisely wrong.</p>
+    <p class="fix"><em>Mitigation</em>Every displayed value carries a provenance tag and an uncertainty band. The assumptions drawer ships in M2, not at the end.</p></div>
+  <div class="risk"><h3>The quasi-static assumption hides the lag</h3>
+    <p>Real occupants respond over 0.1 to 0.3 seconds. Flesh is compliant, foam has hysteresis, and you brace before the corner arrives. A quasi-static solver snaps instantly and will look crisper than any real drive.</p>
+    <p class="fix"><em>Mitigation</em>First-order lag filter on the body response in M4, with the time constant exposed as a labeled assumption.</p></div>
+  <div class="risk"><h3>The bicycle model flatters high steering angles</h3>
+    <p>Ignoring tire slip means the cornering numbers stay optimistic exactly where a driver would be losing the car. Extrapolating past the friction limit produces confident nonsense.</p>
+    <p class="fix"><em>Mitigation</em>Clamp at the friction ellipse and change the display state to "traction exceeded" rather than continuing to draw arrows.</p></div>
+  <div class="risk"><h3>Combined loading gets treated as two independent axes</h3>
+    <p>The most common vehicle dynamics error in casual simulations: allowing 1.0 g braking and 1.0 g cornering simultaneously because each passes its own check. The ellipse is a joint constraint.</p>
+    <p class="fix"><em>Mitigation</em>Equation 4 evaluated as one test on the resultant, with a test case that asserts the diagonal case fails.</p></div>
+  <div class="risk"><h3>Vibration and steady-state are different mathematics</h3>
+    <p>Load transfer is a time-domain quasi-static balance. Whole-body vibration is a frequency-domain weighted RMS over an exposure window. Merging them into one solver produces a mess that satisfies neither.</p>
+    <p class="fix"><em>Mitigation</em>Keep vibration as a separate overlay channel with its own units and its own panel. Do not average a comfort index into a force arrow.</p></div>
+  <div class="risk"><h3>This app has nothing to do with the repository it lives in</h3>
+    <p>vibium is browser automation for AI agents. A vehicle biomechanics simulation is not that. It joins gridprobe and mindmap as unrelated projects sharing a tree, and CLAUDE.md does not acknowledge that apps/ is a scratch space.</p>
+    <p class="fix"><em>Mitigation</em>Either add one line to CLAUDE.md declaring apps/ an explicit sandbox for side projects, or move all three out. Naming it beats letting the drift continue silently.</p></div>
+</div>
+</div>
+
+<div class="wrap">
+<section>
+  <div class="shead"><span class="num">08</span><h2>Assumptions and their provenance</h2></div>
+  <div class="body-col">
+    <p>Two of these could not be confirmed against a primary source in this session, because the network egress policy in this environment blocks the university and reference domains that host the tables. They are carried from prior knowledge and marked accordingly. They must be checked against the printed source before M0 is signed off. That is exactly the discipline the assumptions drawer exists to enforce.</p>
+  </div>
+</section>
+</div>
+
+<div class="wide">
+<div class="tscroll">
+<table>
+<caption>Table 2 &middot; Default parameter set and verification status</caption>
+<thead><tr><th>Parameter</th><th>Default</th><th>Source</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Vehicle mass</td><td>1600 kg</td><td>Mid-size sedan, kerb plus one occupant</td><td>Design choice</td></tr>
+<tr><td>Wheelbase / track</td><td>2.70 m / 1.55 m</td><td>Mid-size sedan typical</td><td>Design choice</td></tr>
+<tr><td>CG height</td><td>0.55 m</td><td>Sedan typical, user-adjustable</td><td>Design choice</td></tr>
+<tr><td>Tire friction &mu;</td><td>0.90 dry, 0.60 wet</td><td>Dry and wet asphalt, passenger tire</td><td>Design choice</td></tr>
+<tr><td>Occupant mass</td><td>78 kg default</td><td>50th percentile male; 5th percentile female offered as alternate</td><td>Verify at M0</td></tr>
+<tr><td>Segment mass fractions</td><td>head+neck 8.1%, trunk 49.7%, thigh 10.0%, shank 4.65%, foot 1.45%</td><td>Winter, anthropometric table, from prior knowledge</td><td>Unverified this session</td></tr>
+<tr><td>Vibration weighting</td><td>W<sub>k</sub> on z with k=1.0; W<sub>d</sub> on x and y with k=1.4</td><td>ISO 2631-1:1997</td><td>Verified by search</td></tr>
+<tr><td>Comfort banding</td><td>&le;0.315 not uncomfortable; 0.315&ndash;0.63 a little uncomfortable</td><td>ISO 2631-1:1997 comfort reactions scale</td><td>Verified by search</td></tr>
+<tr><td>Seated vertical resonance</td><td>4&ndash;6 Hz principal, falling with amplitude; 8&ndash;12 Hz second mode</td><td>Apparent-mass literature, seated whole-body vibration</td><td>Verified by search, corrected</td></tr>
+<tr><td>Friction ellipse</td><td>(F<sub>x</sub>/F<sub>x,max</sub>)&sup2; + (F<sub>y</sub>/F<sub>y,max</sub>)&sup2; = 1</td><td>Standard combined-slip tire model</td><td>Verified by search</td></tr>
+<tr><td>Lateral load transfer</td><td>&Delta;N/N&#8320; = (2h<sub>roll</sub>/t)(a<sub>y</sub>/g)</td><td>Standard roll-axis formulation</td><td>Verified by search</td></tr>
+<tr><td>Body response lag</td><td>&tau; = 0.15 s, first order</td><td>Placeholder, tune against ride studies</td><td>Placeholder</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="wrap">
+<section>
+  <div class="shead"><span class="num">09</span><h2>Illustration prompts</h2></div>
+  <div class="body-col">
+    <p>Four images, one hero and three explanatory, all generated and placed above. Every prompt is kept here in full and uncollapsed so it can be copied, re-run or edited. A document that shows an image but not what produced it is not a reproducible record.</p>
+    <p>One note from the run. The first hero attempt came back with convincing-looking annotation labels that were actually garbled non-words, the standard failure mode when this model is asked for text inside a technical diagram. The fix was an explicit instruction to render no lettering at all and to terminate every leader line in an empty circle. The prompt below is the corrected one.</p>
+  </div>
+
+  <div class="marker">[IMAGE 1 &rarr; placed as Fig. 0 above the introduction. Reuse at top of README.md]</div>
+  <div class="pblock">
+    <div class="plabel"><span class="badge">NBP</span><span>Hero, publication quality</span></div>
+<pre class="prompt">A cutaway anatomical illustration of a seated human driver inside a car cabin, rendered as if the car body were transparent glass, with glowing force vectors traced from the tire contact patches up through the suspension, into the seat frame, and into the driver's pelvis, spine, hands and feet. The driver sits in a normal driving posture with hands at nine and three on the wheel. Rendered in the style of a precise technical engineering illustration crossed with a medical anatomy plate, clean vector linework over a cool grey-blue drafting ground. Lighting is flat and even with no dramatic shadows, like a printed reference plate. The composition is a three-quarter side view from slightly above and behind the driver's right shoulder. Color palette emphasizes cool slate grey and pale blue for the structure, with a single saturated vermilion red reserved only for the force vectors. The mood is clinical, exact and quietly authoritative.</pre>
+  </div>
+
+  <div class="marker">[IMAGE 2 &rarr; placed as Fig. 2 in section 02]</div>
+  <div class="pblock">
+    <div class="plabel"><span class="badge">NB2</span><span>Touchpoint pressure map</span></div>
+<pre class="prompt">A seated human figure shown in silhouette from a three-quarter rear view, with twelve contact regions glowing at different intensities across the body: the sit bones and back of the thighs, the mid back, the outer hip against a seat bolster, a diagonal band across the chest and a band across the hips where the belts cross, both palms, the right forefoot and the left sole. Rendered as a thermal pressure map in the style of a seat-comfort research diagram, smooth gradient blooms rather than hard edges. Lighting comes entirely from the glowing contact regions themselves against a dark charcoal ground. The composition is centered and symmetrical with generous negative space around the figure. Color palette runs from deep indigo at low pressure through teal and amber to a hot white core at the sit bones. The mood is scientific and calm.</pre>
+  </div>
+
+  <div class="marker">[IMAGE 3 &rarr; placed as Fig. 1 in section 01]</div>
+  <div class="pblock">
+    <div class="plabel"><span class="badge">NB2</span><span>Action and reaction pair</span></div>
+<pre class="prompt">A tight close-up of a driver's outer hip and thigh pressed into a car seat side bolster during hard cornering, with the foam visibly compressed and dimpled under the body, and two opposing arrows drawn over the scene: a red arrow pushing from the seat into the body, and a blue arrow of identical length pushing from the body into the seat. Rendered as a hybrid of macro photography and overlaid technical diagram, with the arrows as flat crisp vector graphics sitting on top of the photographic surface. Lighting is soft directional daylight from a side window, raking across the foam to reveal its compression. The composition is a tight horizontal crop filling the frame with the contact itself. Color palette emphasizes warm charcoal leather and grey foam, with saturated red and blue only in the arrows. The mood is intimate and physical.</pre>
+  </div>
+
+  <div class="marker">[IMAGE 4 &rarr; placed as Fig. 3 in section 03]</div>
+  <div class="pblock">
+    <div class="plabel"><span class="badge">NB2</span><span>Weight transfer and the friction ellipse</span></div>
+<pre class="prompt">A four-panel infographic strip showing one car in overhead plan view in each panel, cruising, braking, accelerating and cornering, with the four tire contact patches drawn as circles that grow and shrink to show load transfer between them, and a small friction ellipse diagram beneath each panel with a dot marking the current combined-acceleration state. Rendered in a flat editorial infographic style with confident line weights and clear typographic labels in a condensed sans serif. Lighting is uniform and flat as in printed diagrams. The composition is a horizontal strip of four equal panels separated by thin hairline rules. Color palette is cool paper grey and near-black ink with a single vermilion accent for the loaded tires and the state dot. The mood is instructional and precise.</pre>
+  </div>
+
+  <div class="pblock">
+    <div class="plabel"><span class="badge">MJ</span><span>Midjourney, hero alternate</span></div>
+<pre class="prompt">transparent glass car cabin cutaway, seated driver anatomy visible, glowing vermilion force vectors traced from tire contact patches through suspension into pelvis spine hands and feet, technical engineering illustration crossed with medical anatomy plate, cool slate blue drafting ground, flat even reference-plate lighting, three-quarter view over the right shoulder --ar 16:9 --style raw --stylize 200 --v 7</pre>
+  </div>
+  <div class="pblock">
+    <div class="plabel"><span class="badge">MJ</span><span>Midjourney, pressure map alternate</span></div>
+<pre class="prompt">seated human silhouette three-quarter rear view, twelve glowing contact regions at sit bones thighs mid back outer hip chest belt band palms and feet, thermal pressure map, seat comfort research diagram, smooth gradient blooms on dark charcoal ground, indigo to teal to amber to hot white core, centered symmetrical composition --ar 3:4 --style raw --stylize 150 --v 7</pre>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><span class="num">10</span><h2>References</h2></div>
+  <ul class="refs">
+    <li><b>ISO 2631-1:1997</b>, Mechanical vibration and shock, evaluation of human exposure to whole-body vibration, part 1: general requirements. Supplies the W<sub>k</sub> and W<sub>d</sub> weighting curves, the seated multiplying factors, and the comfort reactions scale. <a href="https://standards.iteh.ai/catalog/standards/iso/ca86d99a-070f-4d3e-a379-a4aa31d09132/iso-2631-1-1997">Catalogue entry</a><span class="vf ok">verified</span></li>
+    <li><b>CRE-MSD, University of Waterloo</b>, Whole-body vibration: overview of standards used to determine health risks. Axis weighting assignments and thresholds. <a href="https://uwaterloo.ca/centre-of-research-expertise-for-the-prevention-of-musculoskeletal-disorders/resources/position-papers/whole-body-vibration-overview-standards-used-determine">Position paper</a><span class="vf no">egress blocked, summary only</span></li>
+    <li><b>Fairley &amp; Griffin</b>, The apparent mass of the seated human body: vertical vibration, Journal of Biomechanics. Principal resonance 4 to 6 Hz, falling with vibration magnitude. <a href="https://www.sciencedirect.com/science/article/abs/pii/0021929089900316">Abstract</a><span class="vf ok">verified</span></li>
+    <li><b>Resonance behaviour of the seated human body and effects of posture</b>, Journal of Biomechanics. Second resonance modes and posture dependence. <a href="https://www.sciencedirect.com/science/article/abs/pii/S0021929097001267">Abstract</a><span class="vf ok">verified</span></li>
+    <li><b>Winter, D. A.</b>, Biomechanics and Motor Control of Human Movement. The segment mass fraction table underlying equation 5. <a href="https://courses.grainger.illinois.edu/me481/sp2021/Anthro-Winter.pdf">Table extract</a><span class="vf no">egress blocked, verify at M0</span></li>
+    <li><b>Milliken &amp; Milliken</b>, Race Car Vehicle Dynamics, SAE. Load transfer, the bicycle model, understeer gradient and the friction ellipse.<span class="vf no">from prior knowledge</span></li>
+    <li><b>Gillespie, T. D.</b>, Fundamentals of Vehicle Dynamics, SAE. The same ground, more introductory.<span class="vf no">from prior knowledge</span></li>
+    <li><b>Friction ellipse and combined slip</b>, standard formulation (F<sub>x</sub>/F<sub>x,max</sub>)&sup2; + (F<sub>y</sub>/F<sub>y,max</sub>)&sup2; = 1. <a href="https://www.researchgate.net/figure/The-friction-ellipse-showing-maximum-lateral-and-longitudinal-forces-the-resultant_fig1_224381490">Diagram</a><span class="vf ok">verified</span></li>
+  </ul>
+  <div class="note" style="margin-top:24px"><b>Method note on triangulation</b>
+  The intended cross-check against a second model through the OpenAI API was blocked by this environment's command classifier, so triangulation ran through web search instead. That is weaker: search returns secondary summaries, and one of them stated the ISO axis weightings backwards. Two source classes could not be reached at all because the egress proxy blocks those domains. Nothing in table 2 marked unverified should be treated as settled.</div>
+</section>
+
+<footer>
+  <p><b>Driver Load Path</b> &middot; build plan, revision A &middot; <b>apps/loadpath</b> in the vibium repository.</p>
+  <p style="margin-top:8px">Prepared by <b>David Berkowitz</b>. Research and drafting with <b>Anthropic Claude</b>. Illustrations to be generated with <b>Google Gemini Nano Banana</b>.</p>
+</footer>
+</div>
