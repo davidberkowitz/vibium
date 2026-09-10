@@ -3,9 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M0 built and green.** The model core runs headless with 57 passing tests. There is no
-interface yet, on purpose — see *Milestones* below. The full build plan is in
-[`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M1 built and green.** The model core and the side elevation both run, with 69 passing
+tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -51,25 +50,44 @@ because foam cannot pull and webbing cannot push. That solver is milestone 2, no
 
 | | | |
 |---|---|---|
-| **M0** | Model core, headless | **done** — 57 tests green |
-| M1 | Side elevation, cruise baseline | next |
-| M2 | Contact solver and provenance drawer | |
+| **M0** | Model core, headless | **done** — 57 tests |
+| **M1** | Side elevation, cruise baseline | **done** — 12 tests |
+| M2 | Contact solver and provenance drawer | next |
 | M3 | Plan view and live sliders | |
 | M4 | Scripted playback | |
 | M5 | Vibration overlay | |
 | M6 | 3D toggle | gated, may be cut |
 
-M0 deliberately has no interface. A wrong number rendered beautifully is more dangerous than a
+M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
 right number rendered plainly, because the polish buys it credibility it hasn't earned.
 
-## Running M0
+## Running it
 
 ```bash
-make test-loadpath      # 57 unit tests
-make loadpath-report    # the headless model report
+make loadpath           # serve the app on http://localhost:8081
+make test-loadpath      # 69 unit tests
+make loadpath-report    # the headless model report, no browser needed
 ```
 
-The report takes two options:
+![The side elevation at the cruise baseline](images/05-m1-side-elevation.png)
+
+M1 is the reference state: a car going straight at a steady speed, which for the occupant is
+indistinguishable from a car parked on level ground. Acceleration is zero, so every loaded
+contact is doing one job — holding the driver up. The counter-intuitive part is that the g-load
+here reads **1.00, not 0**. You always feel your own weight.
+
+All twelve contacts are placed on real anatomy and are selectable, by mouse or keyboard. Picking
+one shows what crosses it in **both** directions, which is the half most driving diagrams leave
+out. A contact can be deep-linked: `index.html?select=bolster`.
+
+![A contact selected, showing both directions of its force pair](images/06-m1-contact-selected.png)
+
+Belts are drawn dashed because at rest they are slack and carrying nothing. A solid belt would
+claim a load the model says is zero. The side bolster gets the drafting symbol for a vector
+pointing into the page rather than an arrow, because a side view cannot honestly show a lateral
+direction.
+
+The headless report takes two options:
 
 ```bash
 node apps/loadpath/js/m0-report.js --surface wet --driver f05

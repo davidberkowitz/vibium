@@ -575,3 +575,216 @@ struct, printed in the same output, so it can't get separated from the thing it 
 
 *Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
 Google Gemini Nano Banana.*
+
+---
+---
+
+# Learning, part three: building M1
+
+The first milestone with pixels in it. Which meant the first milestone where being wrong was
+visible — and, it turns out, where being wrong was *invisible* in a new and more interesting way.
+
+## Step 1 — Approach: draw the skeleton before drawing anything
+
+The instinct with a figure like this is to start placing shapes until it looks like a person. I
+did that in the plan document weeks ago and got away with it, because that drawing was
+decoration. This one is not: twelve labelled markers have to land on twelve specific pieces of
+anatomy, and every marker's position is measured against the body.
+
+So the first thing in the file is not a shape, it's a table of joint coordinates:
+
+```js
+var JOINT = {
+  hip:      { x: 275, y: 285 },   // H-point
+  shoulder: { x: 232, y: 192 },
+  knee:     { x: 390, y: 268 },
+  ...
+};
+```
+
+Everything else derives from that. The torso is a line from hip to shoulder. The seat back is a
+bar offset behind that same line. The "02 Seat back" marker sits on the seat back's outer face,
+computed from the same axis.
+
+**One source of truth for geometry, same as one source of truth for data.** When I later decided
+the pose was too reclined, I moved two numbers and the whole figure — seat, body, markers —
+followed. Had I hand-placed forty shapes, that fix would have been an afternoon.
+
+The car-industry term for the hip joint is the **H-point**, and it's the datum the entire seating
+package is measured from in real vehicle design. Using the real datum wasn't decoration; it's
+what made the geometry composable.
+
+## Step 2 — Roads not taken
+
+**Rejected: showing a force number at each contact.** This was the big one, and it was tempting
+because it would have made the screen look *finished*. Twelve contacts, twelve numbers, done.
+
+I didn't, because the split of the total force across those twelve contacts is the statically
+indeterminate problem from M0 — and it is milestone 2's entire job. Any number I put next to
+"seat pan" today would be a guess wearing a lab coat.
+
+So the panel says, in plain words: *where that total divides across the twelve contacts is not
+modelled yet.* An admission on screen beats a fabrication on screen. It also creates useful
+pressure: the gap is visible every time anyone opens the page, which is a much better motivator
+for building M2 properly than a note in a backlog.
+
+**Rejected: deleting the headless report.** My own plan said `m0-report.js` would be deleted once
+the browser app existed. When I got there, I kept it — and went back and corrected the plan,
+with a note explaining the reversal.
+
+The report is the only thing that prints the unsourced constants on every run, it needs no
+browser, and it's the fastest way to check the physics didn't break. Deleting a working
+verification tool because a document predicted its removal is precisely the plan-over-reality
+mistake this project keeps catching itself making. **A plan is a prediction. When reality
+disagrees, update the prediction — don't damage reality to match it.**
+
+**Rejected: an anatomically detailed body.** The figure is capsules and circles on purpose. A
+realistic body invites the viewer to read detail the model does not have — muscle, posture,
+tissue compliance, none of which is simulated. The schematic look is a promise about fidelity,
+kept visually.
+
+**Rejected: drawing the bolster force as an arrow.** The side bolster acts along the axis
+pointing *into the page*. In a side elevation there is no honest direction to draw. So it gets
+⊗, the drafting convention for exactly that, and the legend explains it. Drawing a plausible
+sideways arrow would have been the visual equivalent of a made-up number.
+
+**Rejected: solid belt lines.** Belts are drawn dashed and faded because at rest they are slack
+and carrying zero. A crisp solid belt would visually claim a load the model says doesn't exist.
+
+## Step 3 — How the pieces connect
+
+```
+model/touchpoints.js   WHAT each contact is: anatomy, axis, sign constraint
+      ↓                (no coordinates — it knows nothing about pictures)
+view2d/side.js         WHERE it is in this view, keyed by the same ids
+      ↓                (no physics — it knows nothing about newtons)
+view2d/vectors.js      HOW an arrow is drawn and scaled
+      ↓
+app.js                 wires model → view, handles selection
+```
+
+The split that earns its keep is the first one. `touchpoints.js` has no x/y coordinates in it at
+all. That's what lets M3's overhead plan view reuse all twelve contacts with completely different
+positions, without a single fact about anatomy being duplicated or drifting between the two
+views. The id is the joint.
+
+The same discipline as M0's `CONSTANTS` / `PROVENANCE` split, applied to a different axis: **keep
+the thing separate from where the thing is drawn.**
+
+## Step 4 — Tools, and one small trick
+
+**Plain SVG built through the DOM, no library.** The figure has maybe sixty elements and needs
+hover, focus, click and keyboard handling on twelve of them. That's what the DOM already does.
+D3 or a framework would have added a build step to a project whose whole architecture is "open
+index.html and it works."
+
+**The outlined-bar trick.** Every piece of seat furniture — back, pan, pedestal, head restraint,
+armrest — needs to look like a solid object with an outline, at an arbitrary angle. Computing
+four rotated rectangle corners for each is fiddly and error-prone. Instead:
+
+```js
+// thick line in the outline colour, thinner line in the fill colour on top
+el('line', {..., stroke: 'var(--line-strong)', 'stroke-width': width});
+el('line', {..., stroke: 'var(--bg-soft)',     'stroke-width': width - 4.4});
+```
+
+Two lines, any angle, rounded ends for free. When the seat read too faintly in the first render,
+the fix was changing `2.6` to `4.4` — one number, thicker outline everywhere.
+
+**Chromium headless for proof.** Playwright isn't installed here but the browser binary is, so
+`--screenshot` with `--virtual-time-budget` was enough. Which brings us to the thing I want you to
+take from this milestone.
+
+## Step 5 — Tradeoffs
+
+| Chose | Gave up | Why |
+|---|---|---|
+| Schematic body | Visual impressiveness | The drawing shouldn't promise fidelity the model lacks |
+| No per-contact numbers | A "finished" looking screen | Every one would be fabricated until M2 |
+| Ids in model, coordinates in view | One tidy file | M3's plan view reuses all twelve for free |
+| Deep-link `?select=` | Strict milestone minimalism | It made the interaction screenshot-testable, which is worth more |
+| Dashed slack belts | A cleaner drawing | Solid webbing would claim a load of zero as if it were real |
+
+## Step 6 — The mess, and the lesson of this milestone
+
+**The first render passed every test and was visibly wrong.**
+
+Sixty-nine tests green. The page loaded. The panel numbers were exact. And when I actually looked
+at the screenshot, the driver appeared to be *lying down*, and several contact markers pointed at
+empty space — "02 Seat back" had a dot floating beside the seat, "01 Seat pan" pointed at a pan
+hidden entirely behind the thigh.
+
+Nothing could have caught this except looking. There is no unit test for "does this read as a
+person sitting in a car." The tests verified that twelve contacts exist, that belts are
+tension-only, that nothing tension-only is loaded at rest — all true, all useless against this
+failure.
+
+So I fixed the pose (real driving package: knees slightly above hips, torso reclined about 25
+degrees), moved every marker onto a feature that is actually visible, widened the seat pan so a
+strip shows below the thigh, and thickened the furniture outlines. Then looked again. Then found
+two force labels colliding, moved the reaction arrow into a clear lane, and looked a third time.
+
+**Three rounds of look-and-fix, none of which any test would have prompted.**
+
+This is the same shape as the garbled `DRYWRY FORCE ITION` labels in the illustration back at the
+planning stage: *a failure that is invisible from every signal except a human looking at the
+output.* Two milestones, two instances. That's a pattern, not a coincidence.
+
+## Step 7 — Pitfalls
+
+- **Green tests are not a rendered page.** If the deliverable is visual, budget for looking at it,
+  and budget for looking at it *more than once*. The second look finds what the first fix broke.
+- **A marker pointing at empty space is worse than no marker.** It teaches the viewer something
+  false about where force enters the body.
+- **Place labels against the skeleton, not against the last version of the drawing.** When the
+  pose changed, markers pinned to old pixel positions became lies.
+- **Draw absent things as absent.** Slack belts dashed, gated contacts marked idle. Visual weight
+  is a claim about load.
+- **When a view can't honestly show a direction, use the convention that says so.** ⊗ exists for
+  exactly this.
+- **Check the label collisions at the size people will actually view it**, not at the size you
+  authored it.
+
+## Step 8 — What an expert notices
+
+**An expert checks whether the picture and the numbers can disagree.** Here they can't, because
+the panel reads from the same `occupant.solve()` the figure does. A beginner would have typed
+"765 N" into the caption as text, and it would have silently gone stale the first time anyone
+changed the driver mass.
+
+**An expert reads the dashes.** Dashed slack webbing, "IDLE" pills, greyed contact numbers — the
+drawing encodes *what is not carrying load* as carefully as what is. Most diagrams draw every
+component at equal weight and lose that information entirely.
+
+**An expert asks what the figure is promising.** A photorealistic body promises tissue mechanics.
+Capsules promise a rigid-body approximation. The drawing style is itself a claim about fidelity,
+and an honest one is worth more than an impressive one.
+
+**An expert notices what's missing and whether its absence is stated.** The per-contact split
+isn't there — and the page says so, in the caption, in the panel note, in the plan. Silence about
+a gap is how a gap becomes a bug someone else discovers.
+
+## Step 9 — What transfers
+
+**Automated checks and human review catch disjoint sets of errors.** Not overlapping sets —
+*disjoint*. Tests caught nothing about the pose; looking caught nothing about the sign
+constraints. A process with only one of them has a hole shaped exactly like the other. This is
+true of financial models, legal documents, and slide decks as much as code.
+
+**Look at the output more than once.** The first pass finds the loudest problem. The second finds
+what your fix disturbed. I have never once been done after the first look.
+
+**Separate the entity from its presentation, and connect them by a stable id.** Touchpoint data
+knows no coordinates; the view knows no physics. This is why a second view costs almost nothing
+later. The same move works for a customer record and its display, a metric and its chart.
+
+**Absence deserves as much design as presence.** The dashed slack belt, the greyed idle row, the
+sentence saying a number isn't modelled yet. Most people design only the filled-in state and let
+the empty state fall out by accident, which is how "no data" ends up rendering as zero.
+
+**When your plan and reality disagree, fix the plan.** I kept a tool my own document said to
+delete, and edited the document. The alternative — deleting something useful to satisfy a
+prediction — is a surprisingly common and entirely avoidable way to make work worse.
+
+*Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
+Google Gemini Nano Banana.*

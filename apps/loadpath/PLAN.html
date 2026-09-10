@@ -174,9 +174,9 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>B &middot; M0 built</dd></div>
+    <div><dt>Revision</dt><dd>C &middot; M1 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
-    <div><dt>Status</dt><dd>M0 green, 57 tests</dd></div>
+    <div><dt>Status</dt><dd>M1 green, 69 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
     <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
     <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
@@ -360,34 +360,38 @@ footer b{color:var(--ink-2);font-weight:600}
     <p>Follows the convention already set by <code>apps/gridprobe</code>: a static page, no build step, plain modules. The model layer is pure functions with no DOM access, which is what makes it unit-testable and what lets the 2D and 3D views share one truth.</p>
   </div>
 <pre class="tree">apps/loadpath/
-├── <b>index.html</b>
-├── <b>styles.css</b>
+├── <b>index.html</b>              <i>built &middot; M1</i>
+├── <b>styles.css</b>              <i>built &middot; M1</i>
 ├── js/
 │   ├── model/
-│   │   ├── <b>constants.js</b>      <i>vehicle presets, anthropometry, each value with a source field</i>
-│   │   ├── <b>vehicle.js</b>        <i>EQ 1–4: accel, load transfer, friction ellipse clamp</i>
-│   │   ├── <b>occupant.js</b>       <i>EQ 5: segment masses, required force per segment</i>
-│   │   ├── <b>contacts.js</b>       <i>the QP: unilateral least-norm force split</i>
-│   │   └── <b>vibration.js</b>      <i>EQ 7: Wk/Wd weighting, ISO comfort banding</i>
+│   │   ├── <b>constants.js</b>      <i>built &middot; values plus a provenance record for each</i>
+│   │   ├── <b>touchpoints.js</b>    <i>built &middot; the twelve contacts: anatomy, axis, sign constraint</i>
+│   │   ├── <b>vehicle.js</b>        <i>built &middot; EQ 1–4: cornering, load transfer, friction ellipse</i>
+│   │   ├── <b>occupant.js</b>       <i>built &middot; EQ 5–6: segment masses, required force, third-law audit</i>
+│   │   ├── <b>contacts.js</b>       <i>M2 &middot; the QP: unilateral least-norm force split</i>
+│   │   └── <b>vibration.js</b>      <i>M5 &middot; EQ 7: Wk/Wd weighting, ISO comfort banding</i>
 │   ├── view2d/
-│   │   ├── <b>side.js</b>           <i>elevation, vertical and fore-aft channels</i>
-│   │   ├── <b>plan.js</b>           <i>overhead, lateral channels and yaw</i>
-│   │   └── <b>vectors.js</b>        <i>arrow scaling, labels, collision-avoided placement</i>
-│   ├── view3d/<b>scene.js</b>       <i>gated, see milestone 6</i>
+│   │   ├── <b>vectors.js</b>        <i>built &middot; arrows, leaders, force-to-length scaling</i>
+│   │   ├── <b>side.js</b>           <i>built &middot; elevation, the twelve contacts placed on anatomy</i>
+│   │   └── <b>plan.js</b>           <i>M3 &middot; overhead, lateral channels and yaw</i>
+│   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gated, may be cut</i>
 │   ├── ui/
-│   │   ├── <b>controls.js</b>       <i>sliders, playback transport</i>
-│   │   └── <b>assumptions.js</b>    <i>the provenance drawer, built in M2 not last</i>
-│   ├── <b>scenarios.js</b>          <i>scripted maneuvers as input timelines</i>
-│   └── <b>app.js</b>
+│   │   ├── <b>controls.js</b>       <i>M3 &middot; sliders, playback transport</i>
+│   │   └── <b>assumptions.js</b>    <i>M2 &middot; the provenance drawer</i>
+│   ├── <b>scenarios.js</b>          <i>M4 &middot; scripted maneuvers as input timelines</i>
+│   ├── <b>m0-report.js</b>          <i>built &middot; headless harness, kept past M1 — see note</i>
+│   └── <b>app.js</b>                <i>built &middot; M1</i>
+├── images/
 ├── <b>README.md</b>
 └── <b>LEARNING.md</b>
 
-<i>tests live at the repo root, following the convention already set by
-gridprobe and mindmap, not inside the app directory:</i>
-tests/loadpath/<b>model.test.js</b>   <i>third-law audit, ellipse bounds, load-transfer sanity</i>
-├── images/
-├── <b>README.md</b>
-└── <b>LEARNING.md</b></pre>
+<i>Tests live at the repo root, following the convention already set by gridprobe
+and mindmap rather than the app-local path this document first predicted:</i>
+tests/loadpath/<b>model.test.js</b>        <i>third-law audit, ellipse bounds, load transfer</i>
+tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, what is loaded at rest</i></pre>
+
+  <div class="note" style="margin-top:22px"><b>One prediction in this document reversed at M1</b>
+  This plan said the headless report would be deleted once <code>app.js</code> arrived. It has been kept. It is the only thing that prints the unsourced constants on every run, it needs no browser, and deleting a working verification tool because a document predicted its removal is exactly the plan-over-reality mistake this project keeps trying to avoid. The document was wrong; the tool stays.</div>
 </section>
 
 <section>
@@ -397,7 +401,7 @@ tests/loadpath/<b>model.test.js</b>   <i>third-law audit, ellipse bounds, load-t
   </div>
   <div class="ms">
     <div class="ms-row done"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists. <b>Done.</b> 57 tests green; worst third-law residual across ten scenarios is 2.5&times;10<sup>&minus;13</sup>&nbsp;N. Run it with <code>make loadpath-report</code>.</p></div><span class="ms-out">console table<br>57 tests green</span></div>
-    <div class="ms-row"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
+    <div class="ms-row done"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled. <b>Done.</b> All twelve contacts placed on real anatomy, each selectable, each showing both directions of its force pair. Run it with <code>make loadpath</code>.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
     <div class="ms-row"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source.</p></div><span class="ms-out">live force split<br>sources panel</span></div>
     <div class="ms-row"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so.</p></div><span class="ms-out">2 views<br>5 inputs</span></div>
     <div class="ms-row"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>

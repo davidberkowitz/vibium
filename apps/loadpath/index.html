@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver Load Path — where the car touches you</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='9' r='4' fill='%23e6edf3'/%3E%3Cpath d='M13 13 L11 21 L22 21' stroke='%23e6edf3' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M24 16 V7' stroke='%23f2716b' stroke-width='2.4' fill='none'/%3E%3Cpath d='M24 5 l3 4 h-6z' fill='%23f2716b'/%3E%3Cpath d='M6 18 v9' stroke='%2358a6ff' stroke-width='2.4' fill='none'/%3E%3Cpath d='M6 29 l-3-4 h6z' fill='%2358a6ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
+    <span class="milestone">M1 · cruise baseline</span>
+    <div class="spacer"></div>
+    <span id="readout" class="readout"></span>
+  </header>
+
+  <main id="stage">
+    <section id="figure-wrap">
+      <div id="figure"></div>
+      <p class="legend">
+        <span class="key act">car → driver</span>
+        <span class="key react">driver → car</span>
+        <span class="key grav">weight</span>
+        <span class="key sym">● centre of mass</span>
+        <span class="key sym">⊗ acts into the page</span>
+        <span class="scale">arrow length ∝ √force</span>
+      </p>
+      <p class="caption">
+        Steady cruise. Acceleration is zero, so every contact is doing one job:
+        holding the driver up. The two coloured arrows are the same force read
+        in opposite directions — that is Newton's third law, not an artistic
+        choice. Where that total divides across the twelve contacts is
+        <strong>not modelled yet</strong>; the split is statically indeterminate
+        and is milestone 2.
+      </p>
+    </section>
+
+    <aside id="panel">
+      <section>
+        <h2>State</h2>
+        <div id="state-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Contacts <span class="count">12</span></h2>
+        <div id="contact-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Selected</h2>
+        <div id="detail"></div>
+      </section>
+
+      <section>
+        <h2>Body segments <span class="count">14</span></h2>
+        <p class="muted">
+          Force each segment needs just to be held up, from equation 5. A hand
+          weighs little; a trunk is half of you.
+        </p>
+        <div id="segment-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Numbers you should not quote yet</h2>
+        <div id="caveats"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="js/model/constants.js"></script>
+  <script src="js/model/touchpoints.js"></script>
+  <script src="js/model/vehicle.js"></script>
+  <script src="js/model/occupant.js"></script>
+  <script src="js/view2d/vectors.js"></script>
+  <script src="js/view2d/side.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
