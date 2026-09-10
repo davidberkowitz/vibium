@@ -788,3 +788,34 @@ prediction — is a surprisingly common and entirely avoidable way to make work 
 
 *Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
 Google Gemini Nano Banana.*
+
+## Postscript: running it found a third one
+
+After M1 was pushed, I drove the app for real — actual mouse clicks and key events over
+the DevTools protocol, not just a screenshot. Every interaction worked: click a contact in the
+figure, the panel follows; click a row in the panel, the figure follows; focus and press Enter,
+same result. No JavaScript errors.
+
+Then I set the viewport to 420px wide, and the figure had **collapsed to a 30-pixel sliver.**
+
+The cause was ordinary: below 900px the layout switched the flex row to a flex column, and the
+panel's very tall content claimed the entire column height, leaving the figure nothing. Two
+elements both saying "give me the remaining space," and the taller one won.
+
+The fix was to stop refereeing it — below 900px the page drops out of flex entirely and becomes
+an ordinary scrolling document, figure first, panel underneath.
+
+**That's the third defect on this project that only a human looking could catch**, after the
+garbled illustration labels and the reclining driver. Every one of them passed every automated
+check. And note what made this one visible: not *a* look, but a look at a **different viewport**.
+The desktop screenshots were fine. The bug lived in a state I hadn't rendered yet.
+
+One more wrinkle worth remembering: the first fix appeared to do nothing, because the browser had
+cached the stylesheet. I nearly went looking for a CSS bug that didn't exist. If a change to
+static assets seems to have no effect, **suspect the cache before you suspect your code** — turn
+it off, then re-test.
+
+So the rule from step 9 gets sharper. It isn't "look at the output." It's **look at the output in
+every state a user can put it in**: each viewport, each selection, empty and full. A single
+screenshot of a single state is one sample from a space, and bugs live in the parts you didn't
+sample.
