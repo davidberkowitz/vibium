@@ -96,7 +96,7 @@ test-gridprobe:
 # Run driver load path tests (pure logic, no browser or build needed)
 test-loadpath:
 	@echo "━━━ Driver Load Path Tests ━━━"
-	node --test tests/loadpath/model.test.js tests/loadpath/touchpoints.test.js tests/loadpath/contacts.test.js
+	node --test tests/loadpath/model.test.js tests/loadpath/touchpoints.test.js tests/loadpath/contacts.test.js tests/loadpath/scenarios.test.js
 
 # Print the Driver Load Path model report (headless, no browser)
 loadpath-report:

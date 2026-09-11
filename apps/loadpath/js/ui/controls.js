@@ -59,6 +59,7 @@
   state.surface = 'dry';
 
   var onChange = null;
+  var onUser = null;
   var nodes = {};
 
   function emit() { if (onChange) onChange(read()); }
@@ -97,6 +98,11 @@
     input.value = spec.value;
     input.setAttribute('aria-describedby', 'out-' + spec.id);
     input.addEventListener('input', function () {
+      /* A human moving this slider outranks anything driving it. Playback is
+         writing to these every frame, so the app is told first and stops the
+         clock before the new value is emitted — otherwise the next frame
+         overwrites what was just dragged. */
+      if (onUser) onUser(spec.id);
       state[spec.id] = parseFloat(input.value);
       out.textContent = spec.format(state[spec.id]);
       emit();
@@ -124,6 +130,7 @@
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', key === state.surface ? 'true' : 'false');
       b.addEventListener('click', function () {
+        if (onUser) onUser('surface');
         state.surface = key;
         [].forEach.call(group.children, function (c) {
           c.classList.remove('on'); c.setAttribute('aria-checked', 'false');
@@ -195,6 +202,30 @@
     emit();
   }
 
+  /* Move the controls to match values that came from somewhere else, WITHOUT
+     emitting. Playback calls this every frame: the sliders are a readout of the
+     scenario at that instant, and re-emitting here would loop the app back
+     through its own solve twice a frame for no gain. set() is the version that
+     does emit, for deep links and presets. */
+  function show(values) {
+    Object.keys(values || {}).forEach(function (k) {
+      if (!nodes[k] || !nodes[k].input) return;
+      if (state[k] === values[k]) return;
+      state[k] = values[k];
+      nodes[k].input.value = values[k];
+      nodes[k].out.textContent = nodes[k].spec.format(values[k]);
+    });
+    if (values && values.surface && values.surface !== state.surface) {
+      state.surface = values.surface;
+      [].forEach.call(nodes.surface.children, function (c, i) {
+        var key = Object.keys(C.SURFACES)[i];
+        var on = key === values.surface;
+        c.classList.toggle('on', on);
+        c.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    }
+  }
+
   function set(values) {
     Object.keys(values || {}).forEach(function (k) {
       if (!nodes[k] || !nodes[k].input) return;
@@ -205,8 +236,9 @@
     emit();
   }
 
-  function mount(root, handler) {
+  function mount(root, handler, userHandler) {
     onChange = handler;
+    onUser = userHandler || null;
     root.innerHTML = '';
     var strip = dom('div', 'ctl-strip');
     SPECS.forEach(function (s) { buildSlider(s, strip); });
@@ -221,7 +253,8 @@
     strip.appendChild(btn);
 
     root.appendChild(strip);
-    return { read: read, reset: reset, set: set, updateGauge: updateGauge };
+    return { read: read, reset: reset, set: set, show: show,
+             updateGauge: updateGauge };
   }
 
   global.LoadPathControls = { mount: mount, SPECS: SPECS };

@@ -1,4 +1,4 @@
-/* Driver Load Path — M3. Two views, five live inputs.
+/* Driver Load Path — M4. Two views, five live inputs, four scripted maneuvers.
 
    Up to now the app showed one frozen state. This is where it becomes a
    simulation: you set what a driver does, and every number and every arrow on
@@ -20,6 +20,13 @@
    The one thing the app refuses to do is draw a state the car cannot reach.
    Past the friction limit it keeps showing the clamped, achievable state and
    says plainly that the demand was more than the tyres have.
+
+   M4 adds time. A scenario is a timeline of those same driver inputs, so
+   playback feeds the chain above from a clock instead of from a thumb — it is
+   not a second code path. The one insertion is between vehicle and occupant:
+   the body's acceleration is a first-order lagged copy of the cabin's, so the
+   figure arrives late the way a real occupant does. The tyres are not lagged;
+   they are bolted to the car.
 */
 (function (global) {
   'use strict';
@@ -33,13 +40,27 @@
   var Plan = global.LoadPathPlanView;
   var Controls = global.LoadPathControls;
   var Assumptions = global.LoadPathAssumptions;
+  var S = global.LoadPathScenarios;
+  var Transport = global.LoadPathTransport;
 
   var CAR = C.VEHICLES.sedan;
   var DRIVER = C.OCCUPANTS.m50;
 
-  var sideView = null, planView = null, controls = null;
+  var sideView = null, planView = null, controls = null, transport = null;
   var selectedId = null;
-  var cur = { inputs: null, vehicle: null, occupant: null, split: null };
+  var cur = { inputs: null, vehicle: null, occupant: null, split: null, lagErr: 0 };
+
+  /* M4 playback state. One clock, one rAF loop, one lag tracker — see frame(). */
+  var lag = S.makeLag(S.TAU);
+  var target = null;          // the inputs we are heading toward
+  var rafId = null;
+  var lastT = 0;
+
+  /* Below this the body is close enough to the cabin that the difference is
+     not a physical statement, just arithmetic left over. Pin and stop the
+     loop: an idle page should burn no frames, and a settled screenshot should
+     be bit-identical to the same state reached by slider alone. */
+  var SETTLE = 0.02;          // m/s^2
 
   function n1(x) { return x.toFixed(1); }
   function load(id) {
@@ -54,14 +75,19 @@
   }
 
   /* ---------------- the one solve ---------------- */
-  function solveAll(inputs) {
+  function solveAll(inputs, bodyAccel) {
     var vehicle = V.solve({
       speed: inputs.speed, steerAngle: inputs.steerAngle,
       ax: inputs.ax, mu: inputs.mu, gradePercent: inputs.gradePercent
     }, CAR);
+    /* The tyres get the cabin's acceleration; the occupant gets the lagged
+       one. During a transient those genuinely differ, and the drawings are
+       supposed to show that rather than average it away: the corner loads have
+       already moved while the body is still arriving. */
+    var a = bodyAccel || vehicle.accel;
     var occupant = O.solve({
       bodyMass: DRIVER.mass,
-      accel: O.vec(vehicle.accel.x, vehicle.accel.y, 0),
+      accel: O.vec(a.x, a.y, 0),
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
     var split = K.solve(occupant.carOnBody);
@@ -86,6 +112,8 @@
       ['Longitudinal', (v.accel.x / C.G).toFixed(2) + ' g', v.accel.x < -0.01 ? 'braking' : (v.accel.x > 0.01 ? 'accelerating' : 'steady')],
       ['Lateral', (v.accel.y / C.G).toFixed(2) + ' g', v.accel.y > 0.01 ? 'turning left' : (v.accel.y < -0.01 ? 'turning right' : 'straight')],
       ['Turn radius', r === Infinity ? '—' : r.toFixed(0) + ' m', 'from speed and steering'],
+      ['Body vs cabin', cur.lagErr > 0 ? (cur.lagErr / C.G).toFixed(2) + ' g behind' : 'settled',
+       cur.lagErr > 0 ? 'the occupant is still arriving' : 'body and cabin agree'],
       ['Traction used', (v.utilisation * 100).toFixed(0) + ' %', v.tractionExceeded ? 'DEMAND EXCEEDS GRIP' : 'within the friction ellipse'],
       ['Car → driver', n1(O.magnitude(s.carOnBody)) + ' N', 'total across all contacts'],
       ['Contacts carrying load', loaded + ' of 12', 'the rest are idle or slack'],
@@ -94,7 +122,10 @@
       ['Split balance residual', bal ? bal.residual.toExponential(1) + ' N' : '—', 'the split re-sums to the total']
     ];
     rows.forEach(function (x) {
-      var row = el('div', 'row' + (x[0] === 'Traction used' && v.tractionExceeded ? ' warn' : ''));
+      var cls = 'row';
+      if (x[0] === 'Traction used' && v.tractionExceeded) cls += ' warn';
+      if (x[0] === 'Body vs cabin' && cur.lagErr > 0) cls += ' transient';
+      var row = el('div', cls);
       row.appendChild(el('span', 'k', x[0]));
       row.appendChild(el('span', 'v', x[1]));
       row.appendChild(el('span', 'note', x[2]));
@@ -229,8 +260,9 @@
   }
 
   /* ---------------- redraw ---------------- */
-  function apply(inputs) {
-    cur = solveAll(inputs);
+  function draw(inputs, bodyAccel, lagErr) {
+    cur = solveAll(inputs, bodyAccel);
+    cur.lagErr = lagErr || 0;
 
     document.getElementById('readout').textContent =
       CAR.label + ' · ' + DRIVER.label + ' · ' + C.SURFACES[inputs.surface].label.toLowerCase();
@@ -247,11 +279,90 @@
     if (selectedId) select(selectedId); else renderDetail(null);
   }
 
+  /* ---------------- the frame loop ----------------
+
+     One loop serves both jobs, because both are the same job: something is
+     changing and the drawing has to keep up. Playback moves the inputs; the
+     lag moves the body toward whatever the inputs produced. Either can be the
+     only thing running.
+
+     It shuts itself off. When nothing is playing and the body has caught the
+     cabin, the last frame pins the lag exactly on target, draws once more, and
+     stops requesting frames. That is not just politeness about battery: it is
+     what makes a settled M4 state identical to the M3 state it replaces, which
+     is the difference between "the lag is a transient" and "the lag quietly
+     biases every number on screen".  */
+  function frame(now) {
+    rafId = null;
+    var dt = lastT ? Math.min(0.25, (now - lastT) / 1000) : 0;
+    lastT = now;
+
+    if (transport && transport.isPlaying()) {
+      transport.advance(dt);
+      target = transport.inputs();
+      controls.show(target);
+    }
+
+    var vehicle = V.solve({
+      speed: target.speed, steerAngle: target.steerAngle,
+      ax: target.ax, mu: target.mu, gradePercent: target.gradePercent
+    }, CAR);
+    var want = { x: vehicle.accel.x, y: vehicle.accel.y };
+
+    if (transport && transport.lagEnabled()) lag.step(want, dt);
+    else lag.reset(want);
+
+    var err = lag.error(want);
+    var settled = err < SETTLE;
+    if (settled) lag.reset(want);
+    draw(target, lag.value(), settled ? 0 : err);
+
+    var running = (transport && transport.isPlaying()) || !settled;
+    if (running) rafId = requestAnimationFrame(frame);
+    else lastT = 0;
+  }
+
+  function wake() {
+    if (rafId == null) { lastT = 0; rafId = requestAnimationFrame(frame); }
+  }
+
+  /* Controls emit here. The loop does the solving, so this only records where
+     we are headed and makes sure something is turning. */
+  function setTarget(inputs) { target = inputs; wake(); }
+
+  /* Snap to a state with no transient — page load, a scrub, a scenario
+     change. There is no "previous" for the body to be arriving from. */
+  function seek(inputs) {
+    target = inputs;
+    /* The controls are the readout of wherever we just jumped to. Without
+       this a scrubbed or freshly loaded scenario draws the right figure over
+       a set of sliders still showing the last thing the user touched, which
+       reads as a bug even though the solve is correct. */
+    if (controls) controls.show(inputs);
+    var vehicle = V.solve({
+      speed: inputs.speed, steerAngle: inputs.steerAngle,
+      ax: inputs.ax, mu: inputs.mu, gradePercent: inputs.gradePercent
+    }, CAR);
+    lag.reset({ x: vehicle.accel.x, y: vehicle.accel.y });
+    draw(inputs, lag.value(), 0);
+  }
+
   function boot() {
     Assumptions.mount(document.body, document.getElementById('btn-assumptions'));
-    controls = Controls.mount(document.getElementById('controls'), apply);
+    controls = Controls.mount(
+      document.getElementById('controls'),
+      setTarget,
+      /* A human touched a control. Whatever was scripting those sliders is
+         over — the scenario chip drops back to Manual and the clock stops. */
+      function () { if (transport) transport.stop('manual'); }
+    );
+    transport = Transport.mount(document.getElementById('transport'), {
+      onSeek: function (inputs) { seek(inputs); },
+      onModeChange: function () { wake(); },
+      onLagChange: function () { wake(); }
+    });
     renderCaveats();
-    apply(controls.read());
+    seek(controls.read());
 
     var want = new URLSearchParams(location.search);
     var sel = want.get('select');
@@ -264,11 +375,22 @@
       if (want.has(k)) preset[k] = parseFloat(want.get(k));
     });
     if (Object.keys(preset).length) controls.set(preset);
+
+    /* ?play=lane_change loads and starts a maneuver straight from a link,
+       which is also how the headless screenshot pass drives it. */
+    var play = want.get('play');
+    if (play && S.byId(play)) transport.load(play);
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else { boot(); }
 
-  global.LoadPathApp = { select: select, apply: apply, current: function () { return cur; } };
+  global.LoadPathApp = {
+    select: select,
+    apply: setTarget,
+    seek: seek,
+    current: function () { return cur; },
+    transport: function () { return transport; }
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
