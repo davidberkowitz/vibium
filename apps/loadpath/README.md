@@ -3,8 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M2 built and green.** The model core, the side elevation and the contact force solver
-all run, with 126 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M3 built and green.** Two views, five live inputs, and the solver running behind them,
+with 136 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -29,6 +29,43 @@ pushes back into the car.
 
 Emergency and crash loading is explicitly **out of scope**. Different data sources, much higher
 stakes on accuracy, and it deserves its own project if it is ever wanted.
+
+## Two views, because one cannot be honest on its own
+
+A side elevation can show vertical and fore-aft load truthfully and **cannot show lateral load at
+all** — in profile, a sideways force points into the page. That is why the bolster gets a crossed
+circle there rather than an arrow. The plan view is the other half: seen from above, lateral force
+has a direction again, and the contacts that only matter in a corner finally have somewhere to be
+drawn properly.
+
+The plan view also surfaces something that had been computed since M0 and never shown: the
+**per-corner tyre loads**. Brake and watch the front pair swell. Turn and watch load cross to the
+outside. It also shows the driver sitting well off the centreline, which is the reason the
+reciprocal force is worth drawing at all.
+
+## Five inputs, one solve
+
+Speed, steering, brake, throttle and grade, plus the surface under the tyres. These are **driver
+inputs, not accelerations** — you do not set 0.6 g of cornering, you turn a wheel at a speed and
+the car works out what that costs.
+
+Grade is real rather than faked: gravity tilts into the cabin frame, which is why a hill presses
+you into the seat back while you are standing still, and why an uphill lightens the nose exactly
+as throttle does. Standing on a 20% slope still reads **1.00 g** — same magnitude, pointing
+somewhere else.
+
+Everything downstream comes from one solve. The panel does not re-derive the g-load and the gauge
+does not re-derive the friction utilisation. Two places computing the same number is two places to
+disagree.
+
+## Asking for more than the tyres have
+
+![Over the friction limit](images/11-m3-over-limit.png)
+
+Demand more grip than the surface can supply and the app does not extrapolate. The traction gauge
+turns, a banner explains what happened, and **both drawings keep showing the clamped state the
+tyres can actually deliver** rather than the state you asked for. Switch the surface to wet and
+the same inputs jump from 67% of the budget to 175%.
 
 ## Known limitation in the anthropometry
 
@@ -92,8 +129,8 @@ goes — they are absorbing kinematics the model does not have.
 | **M0** | Model core, headless | **done** — 57 tests |
 | **M1** | Side elevation, cruise baseline | **done** — 12 tests |
 | **M2** | Contact solver and provenance drawer | **done** — 57 tests |
-| M3 | Plan view and live sliders | next |
-| M4 | Scripted playback | |
+| **M3** | Plan view and live sliders | **done** — 10 tests |
+| M4 | Scripted playback | next |
 | M5 | Vibration overlay | |
 | M6 | 3D toggle | gated, may be cut |
 
@@ -108,7 +145,7 @@ make test-loadpath      # 69 unit tests
 make loadpath-report    # the headless model report, no browser needed
 ```
 
-![The force split at the cruise baseline](images/08-m2-force-split.png)
+![Cornering, with both views live](images/10-m3-cornering.png)
 
 M1 is the reference state: a car going straight at a steady speed, which for the occupant is
 indistinguishable from a car parked on level ground. Acceleration is zero, so every loaded

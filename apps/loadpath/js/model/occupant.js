@@ -54,15 +54,36 @@
     return out;
   }
 
-  /* EQ 5. The force the car's contacts must supply to a mass riding at accel a. */
-  function requiredForce(mass, accel) {
-    return vec(mass * accel.x, mass * accel.y, mass * (accel.z + G));
+  /* Gravity in the VEHICLE frame. On level ground it is straight down the
+     cabin's own z axis. On a grade the cabin is tilted, so gravity acquires a
+     component along the cabin's x axis — which is exactly why a steep uphill
+     presses you into the seat back while standing still.
+
+     gradePercent is rise over run times 100, positive uphill. */
+  function gravityForGrade(gradePercent) {
+    var theta = Math.atan((gradePercent || 0) / 100);
+    return vec(-G * Math.sin(theta), 0, -G * Math.cos(theta));
+  }
+
+  var LEVEL = vec(0, 0, -G);
+
+  /* EQ 5, with gravity as a parameter rather than a constant.
+
+     F_contact = m * (a - g)
+
+     Passing g explicitly is what makes road grade real instead of faked. On
+     level ground g is (0,0,-9.81) and this reduces to the original form. */
+  function requiredForce(mass, accel, gravity) {
+    var g = gravity || LEVEL;
+    return vec(mass * (accel.x - g.x), mass * (accel.y - g.y), mass * (accel.z - g.z));
   }
 
   /* Apparent g-load felt by the occupant: the magnitude of (a - g) in units of
-     g. Sitting still this is 1.0, not 0 — you feel your own weight. */
-  function gLoad(accel) {
-    return Math.hypot(accel.x, accel.y, accel.z + G) / G;
+     g. Sitting still on level ground this is 1.0, not 0 — you feel your own
+     weight. On a grade it is still 1.0, just pointing somewhere else. */
+  function gLoad(accel, gravity) {
+    var g = gravity || LEVEL;
+    return Math.hypot(accel.x - g.x, accel.y - g.y, accel.z - g.z) / G;
   }
 
   /* Full occupant state for a cabin acceleration.
@@ -70,8 +91,9 @@
      opts: { bodyMass (kg), accel ({x,y,z} m/s^2) } */
   function solve(opts) {
     var accel = opts.accel;
+    var gravity = opts.gravity || LEVEL;
     var segments = segmentMasses(opts.bodyMass).map(function (s) {
-      var f = requiredForce(s.mass, accel);
+      var f = requiredForce(s.mass, accel, gravity);
       return {
         key: s.key, label: s.label, mass: s.mass,
         carOnBody: f,
@@ -85,10 +107,11 @@
     return {
       bodyMass: opts.bodyMass,
       accel: accel,
+      gravity: gravity,
       segments: segments,
       carOnBody: total,
       bodyOnCar: negate(total),
-      gLoad: gLoad(accel)
+      gLoad: gLoad(accel, gravity)
     };
   }
 
@@ -100,7 +123,7 @@
 
      Returns the worst residual in newtons. The tests require it near zero. */
   function auditThirdLaw(state) {
-    var expected = requiredForce(state.bodyMass, state.accel);
+    var expected = requiredForce(state.bodyMass, state.accel, state.gravity);
     var sumResidual = magnitude(add(state.carOnBody, negate(expected)));
     var pairResidual = magnitude(add(state.carOnBody, state.bodyOnCar));
     return {
@@ -115,6 +138,8 @@
     vec: vec, add: add, scale: scale, negate: negate, magnitude: magnitude,
     segmentMasses: segmentMasses,
     requiredForce: requiredForce,
+    gravityForGrade: gravityForGrade,
+    LEVEL: LEVEL,
     gLoad: gLoad,
     solve: solve,
     auditThirdLaw: auditThirdLaw

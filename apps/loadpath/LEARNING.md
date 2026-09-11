@@ -1038,3 +1038,191 @@ representation that cannot express one is better, and it never goes stale.
 
 *Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
 Google Gemini Nano Banana.*
+
+---
+---
+
+# Learning, part five: building M3, when it became a simulation
+
+Three milestones of one frozen state. This is where it starts responding.
+
+## Step 1 — Approach: one solve, everything downstream
+
+The temptation with sliders is to wire each control to the thing it visibly affects. Steering
+moves the lateral arrow. Brake moves the tyre patches. It feels direct and it is a trap, because
+you end up with several places computing overlapping quantities, and the moment two of them
+disagree you have a bug nobody can locate.
+
+So the whole milestone is built on one function:
+
+```
+controls → inputs → vehicle → occupant → contacts → both views
+```
+
+One `solveAll()` per input change. The panel does not re-derive the g-load. The traction gauge
+does not re-derive the friction utilisation — the app hands it the solved vehicle state. **Two
+places computing the same number is two places to disagree**, and on a page with forty live
+numbers that is not a hypothetical.
+
+## Step 2 — Roads not taken
+
+**Rejected: sliders that set accelerations.** The obvious API is a "lateral g" slider. It would
+have been less code and it would have quietly destroyed the point. You cannot set 0.6 g. You turn
+a wheel at a speed and the car works out what that costs, and sometimes the answer is *it can't*.
+Making the inputs be **what a driver actually does** is what lets the friction ellipse mean
+something.
+
+**Rejected: faking grade as a fore-aft force.** I could have added `mass * g * sin(theta)` to the
+longitudinal acceleration and called it a hill. It gives roughly right numbers for roughly wrong
+reasons, and it breaks the moment you ask what the g-load is.
+
+The honest version is that on a slope **the cabin is tilted, so gravity acquires a component
+along the car's own x axis**. So `requiredForce` gained a gravity parameter, defaulting to
+straight down. Two consequences fall straight out and both are checkable: a hill presses you into
+the seat back while standing still, and standing on a 20% slope still reads exactly **1.00 g** —
+same magnitude of gravity, just pointing somewhere else. A fudge would have got that second one
+wrong and nobody would have noticed.
+
+**Rejected: drawing all twelve contacts in both views.** The plan view shows six — the ones a
+top-down view can show honestly. Drawing the seat pan from above adds no information the side
+elevation lacks, and doubles the clutter. **Each view carries what it can be truthful about.**
+
+**Rejected: leaving the tyre loads invisible.** The vehicle solver has computed per-corner loads
+since M0 and nothing had ever drawn them. They are the clearest possible picture of weight
+transfer, and the plan view had exactly the right shape to show them. Sometimes a milestone's
+best feature is exposing something you already built.
+
+## Step 3 — How the pieces connect
+
+```
+controls.js   what a driver does          (no physics)
+   ↓
+app.js        solveAll(), once per change (no drawing)
+   ↓
+vehicle.js → occupant.js → contacts.js    (no DOM)
+   ↓
+side.js + plan.js                          (no physics)
+```
+
+Every layer knows only its neighbours. The controls module cannot compute an acceleration; the
+view modules cannot compute a force. That is what made the plan view cheap to add: it consumes
+exactly the same solved objects the side view already consumed, and the touchpoint register it
+draws from was built in M1 with **no coordinates in it**, precisely so a second view could place
+the same twelve contacts differently.
+
+That decision was made two milestones before it paid off. Most architectural decisions are like
+that: the cost is immediate and the payoff is deferred, which is why they're easy to skip.
+
+## Step 4 — Tradeoffs
+
+| Chose | Gave up | Why |
+|---|---|---|
+| Inputs as driver actions | A simpler API | It's what makes the friction limit meaningful |
+| Gravity as a parameter | A one-line grade fudge | The fudge gets the g-load wrong and hides it |
+| Six contacts in plan | Symmetry with the side view | Each view shows only what it can show honestly |
+| Full re-render per change | Diffing the SVG | ~60 nodes; correctness beats a speed nobody can perceive |
+| Clamp and announce | Extrapolating past the limit | Past the ellipse the drawing describes nothing real |
+
+## Step 5 — The mess
+
+**The whole app failed to boot, and the error had nothing to do with physics.**
+
+Blank page. Zero sliders, zero contacts. Every module had loaded — all eleven globals present —
+and nothing had rendered. The console had one line:
+
+```
+InvalidCharacterError: Failed to execute 'setAttribute' on 'Element':
+'0' is not a valid attribute name.
+```
+
+The cause is worth the retelling. I have two element helpers with the same name and **different
+signatures**:
+
+```js
+V.el(tag, attrsObject, parent)   // builds SVG nodes
+el(tag, classString, text)       // builds HTML nodes
+```
+
+In `controls.js` I wrote `var el = V.el` at the top, then used it to build HTML: `el('div',
+'ctl-strip')`. The SVG helper dutifully iterated the string `'ctl-strip'`, took its character
+index `0` as an attribute name, and threw. Because that happened during `mount()`, **the entire
+boot died** — the sliders, both views, the panel, everything.
+
+Two things to take from it. First, a single throw in a synchronous boot path takes down
+everything after it; the blast radius of an error has nothing to do with the size of the mistake.
+Second, and more the point: **two functions with the same name and different signatures is a trap
+you will walk into.** The fix wasn't just correcting the call sites, it was renaming so the
+collision cannot recur — the SVG one stays `V.el`, the HTML one is `dom()`, and a comment
+explains why they're named for what they build.
+
+**Then two layout bugs only a screenshot could show.** Plan-view labels ran off both edges of the
+viewBox, clipped mid-word into "eering wheel 33 N". Fixed by authoring the drawing around a
+convenient origin and shifting the whole scene at render time, rather than re-numbering forty
+coordinates by hand.
+
+And the lateral force arrow ran straight through the rear tyre-patch labels. Moved below the car
+body entirely. Both tests-green. Both invisible except by looking.
+
+**And I killed my own shell. Twice.** Running `pkill -f "http.server 8081"` in a command whose own
+text contains that string — the pattern matched the shell running it. Exit code 144. The second
+time it silently ate a commit I thought had landed.
+
+## Step 6 — Pitfalls
+
+- **Never give two functions the same name and different signatures.** Especially not across
+  modules where one is aliased into the other's scope.
+- **A throw during boot takes out everything downstream of it.** When a page renders *nothing*,
+  suspect one early exception rather than many broken things.
+- **`pkill -f` matches the process running it.** Use a pattern that can't match your own command
+  line, or don't use it.
+- **Author drawings around a convenient origin and translate at render time.** Re-numbering
+  coordinates by hand to make room for a label is how geometry rots.
+- **Make inputs the things a user actually controls.** The moment you expose a derived quantity as
+  an input, you've removed the model's ability to say "that isn't possible."
+- **When you add a parameter with a default, test that omitting it is unchanged.** There's a test
+  asserting a call with no grade matches a call with `gradePercent: 0`, because every call site
+  written before M3 depends on it.
+
+## Step 7 — What an expert notices
+
+**An expert checks the invariant that should NOT change.** Adding grade, the interesting
+assertion isn't that forces shifted — it's that the g-load at rest is still exactly 1.00 on every
+slope. Gravity tilted; it didn't shrink. Verifying what should stay fixed catches the errors that
+verifying what should move will miss.
+
+**An expert asks what each view is allowed to claim.** A profile cannot show lateral force. Once
+you accept that, you either draw a second view or you draw a symbol that admits the limitation.
+What you don't do is draw a plausible sideways arrow in a view that can't support one.
+
+**An expert notices that the data model already supported this.** The touchpoint register had no
+coordinates in it, deliberately, since M1. The second view cost almost nothing because of a
+decision made before there was a second view to justify it.
+
+**An expert reads a blank page as one error, not many.** Eleven globals loaded and nothing
+rendered says "something threw early," not "eleven things are broken."
+
+## Step 8 — What transfers
+
+**One source of truth, recomputed, beats many sources kept in sync.** Kept-in-sync is a promise
+you renew on every edit. Recomputed-from-one-place is a property of the structure. True of
+spreadsheets, dashboards, and any document where the same figure appears twice.
+
+**Model the mechanism, not the symptom.** Grade as tilted gravity took one extra parameter and got
+two more things right for free. Grade as an added force would have looked identical on the main
+screen and been wrong everywhere else. The shortcut and the real thing often agree on the case you
+first check — that's exactly why the shortcut survives.
+
+**Same name, different meaning, is a bug waiting for a deadline.** Two `el` functions cost an
+entire boot. This is the software version of two teams using "active user" to mean different
+things, and it fails the same way: quietly, until it doesn't.
+
+**Expose what you already built before building more.** The tyre loads existed for three
+milestones without being visible. The highest-value feature in this milestone was showing
+something that was already there.
+
+**Give the system a way to say "no."** The friction ellipse lets the model refuse. A design where
+every input produces a confident output is a design that cannot tell you when you have left
+reality, and users will believe it anyway.
+
+*Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
+Google Gemini Nano Banana.*
