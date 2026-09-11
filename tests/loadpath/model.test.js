@@ -13,8 +13,10 @@ const assert = require('node:assert');
 require('../../apps/loadpath/js/model/constants.js');
 require('../../apps/loadpath/js/model/vehicle.js');
 require('../../apps/loadpath/js/model/occupant.js');
+require('../../apps/loadpath/js/model/contacts.js');
 
-const { LoadPathConstants: C, LoadPathVehicle: V, LoadPathOccupant: O } = globalThis;
+const { LoadPathConstants: C, LoadPathVehicle: V, LoadPathOccupant: O,
+        LoadPathContacts: K } = globalThis;
 
 const G = C.G;
 const SEDAN = C.VEHICLES.sedan;
@@ -368,5 +370,102 @@ describe('end to end: vehicle into occupant', () => {
     // calls this out as the reason the reciprocal force is worth drawing.
     const share = DRIVER / SEDAN.mass;
     assert.ok(share > 0.04 && share < 0.07, `driver is ${(share * 100).toFixed(1)}% of the car`);
+  });
+});
+
+describe('road grade (M3)', () => {
+  const G_ = C.G;
+
+  test('level ground reduces to plain gravity', () => {
+    const g = O.gravityForGrade(0);
+    assert.ok(close(g.x, 0, 1e-12));
+    assert.ok(close(g.z, -G_, 1e-12));
+  });
+
+  test('a grade tilts gravity into the cabin, it does not shrink it', () => {
+    for (const pct of [-25, -10, 0, 10, 25]) {
+      const g = O.gravityForGrade(pct);
+      assert.ok(close(Math.hypot(g.x, g.y, g.z), G_, 1e-12),
+        `grade ${pct}% changed the magnitude of gravity`);
+    }
+  });
+
+  test('uphill pushes the driver forward, into the seat back', () => {
+    // Standing still on a hill you are held by the seat back, not the belt.
+    const s = O.solve({ bodyMass: DRIVER, accel: O.vec(0, 0, 0),
+                        gravity: O.gravityForGrade(15) });
+    assert.ok(s.carOnBody.x > 0, 'the contacts must push the body up-slope');
+    const down = O.solve({ bodyMass: DRIVER, accel: O.vec(0, 0, 0),
+                           gravity: O.gravityForGrade(-15) });
+    assert.ok(down.carOnBody.x < 0);
+    assert.ok(close(s.carOnBody.x, -down.carOnBody.x, 1e-9), 'grade should be antisymmetric');
+  });
+
+  test('standing on a hill is still exactly 1 g, just pointing elsewhere', () => {
+    for (const pct of [-20, 0, 20]) {
+      const s = O.solve({ bodyMass: DRIVER, accel: O.vec(0, 0, 0),
+                          gravity: O.gravityForGrade(pct) });
+      assert.ok(close(s.gLoad, 1.0, 1e-12), `grade ${pct}% reported ${s.gLoad} g at rest`);
+    }
+  });
+
+  test("the third-law audit still holds on a grade", () => {
+    for (const pct of [-20, -5, 5, 20]) {
+      const s = O.solve({ bodyMass: DRIVER, accel: O.vec(-4, 3, 0),
+                          gravity: O.gravityForGrade(pct) });
+      assert.ok(O.auditThirdLaw(s).worst < 1e-9, `grade ${pct}% broke the audit`);
+    }
+  });
+
+  test('uphill unloads the front axle, downhill loads it', () => {
+    const level = V.solve({ speed: 0, steerAngle: 0, ax: 0, mu: 0.9, gradePercent: 0 }, SEDAN);
+    const up = V.solve({ speed: 0, steerAngle: 0, ax: 0, mu: 0.9, gradePercent: 15 }, SEDAN);
+    const down = V.solve({ speed: 0, steerAngle: 0, ax: 0, mu: 0.9, gradePercent: -15 }, SEDAN);
+    assert.ok(up.corners.frontAxle < level.corners.frontAxle, 'uphill should lighten the nose');
+    assert.ok(down.corners.frontAxle > level.corners.frontAxle);
+    assert.ok(up.corners.rearAxle > level.corners.rearAxle);
+  });
+
+  test('on a grade the corners sum to the weight component normal to the road', () => {
+    for (const pct of [0, 10, -10, 20]) {
+      const theta = Math.atan(pct / 100);
+      const r = V.solve({ speed: 0, steerAngle: 0, ax: 0, mu: 0.9, gradePercent: pct }, SEDAN);
+      const expected = SEDAN.mass * G_ * Math.cos(theta);
+      assert.ok(close(r.corners.total, expected, 1e-7),
+        `grade ${pct}%: corners total ${r.corners.total}, expected ${expected}`);
+    }
+  });
+
+  test('an unspecified grade behaves exactly like level ground', () => {
+    // Backward compatibility: every call site written before M3 must be unaffected.
+    const a = V.solve({ speed: 20, steerAngle: 0.03, ax: -3, mu: 0.9 }, SEDAN);
+    const b = V.solve({ speed: 20, steerAngle: 0.03, ax: -3, mu: 0.9, gradePercent: 0 }, SEDAN);
+    assert.ok(close(a.corners.total, b.corners.total, 1e-9));
+    assert.ok(close(a.corners.loads.frontLeft, b.corners.loads.frontLeft, 1e-9));
+
+    const p = O.solve({ bodyMass: DRIVER, accel: O.vec(-3, 2, 0) });
+    const q = O.solve({ bodyMass: DRIVER, accel: O.vec(-3, 2, 0), gravity: O.gravityForGrade(0) });
+    assert.ok(close(p.carOnBody.z, q.carOnBody.z, 1e-9));
+  });
+
+  test('a grade feeds through to the contact split without breaking it', () => {
+    for (const pct of [-18, 0, 18]) {
+      const s = O.solve({ bodyMass: DRIVER, accel: O.vec(0, 0, 0),
+                          gravity: O.gravityForGrade(pct) });
+      const split = K.solve(s.carOnBody);
+      assert.ok(split.feasible, `grade ${pct}% came back infeasible`);
+      assert.ok(K.auditBalance(split, s.carOnBody).residual < 1e-4);
+      for (const ch of split.channels) assert.ok(ch.magnitude >= -1e-9, `${ch.id} negative`);
+    }
+  });
+
+  test('a steep uphill loads the seat back more than level ground does', () => {
+    const back = (pct) => {
+      const s = O.solve({ bodyMass: DRIVER, accel: O.vec(0, 0, 0),
+                          gravity: O.gravityForGrade(pct) });
+      const sp = K.solve(s.carOnBody);
+      return sp.byTouchpoint.seat_back ? sp.byTouchpoint.seat_back.magnitude : 0;
+    };
+    assert.ok(back(18) > back(0), 'a hill should press you into the seat back');
   });
 });

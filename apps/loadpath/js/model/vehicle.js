@@ -83,8 +83,17 @@
      read as indicative rather than quoted. */
   function cornerLoads(opts) {
     var m = opts.mass, ff = opts.frontWeightFraction;
-    var weight = m * G;
-    var dLong = longitudinalLoadTransfer(opts);
+    var theta = Math.atan((opts.gradePercent || 0) / 100);
+
+    /* On a grade two things change and both matter. The weight pressing into
+       the road is reduced by cos(theta), and gravity gains a component along
+       the car's own x axis which transfers load exactly as acceleration does.
+       An uphill unloads the front axle for the same reason throttle does. */
+    var weight = m * G * Math.cos(theta);
+    var dLong = longitudinalLoadTransfer({
+      mass: m, ax: opts.ax + G * Math.sin(theta),
+      cgHeight: opts.cgHeight, wheelbase: opts.wheelbase
+    });
     var dLat = lateralLoadTransfer(opts);
 
     var frontAxle = weight * ff - dLong;
@@ -138,6 +147,7 @@
       mass: params.mass,
       ax: clamped.ax,
       ay: clamped.ay,
+      gradePercent: inputs.gradePercent || 0,
       cgHeight: params.cgHeight,
       wheelbase: params.wheelbase,
       track: params.track,
@@ -146,6 +156,7 @@
 
     return {
       demanded: { ax: ax, ay: ay },
+      gradePercent: inputs.gradePercent || 0,
       accel: { x: clamped.ax, y: clamped.ay, z: 0 },
       utilisation: utilisation,
       tractionExceeded: utilisation > 1,

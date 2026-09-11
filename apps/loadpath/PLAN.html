@@ -174,9 +174,9 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>D &middot; M2 built</dd></div>
+    <div><dt>Revision</dt><dd>E &middot; M3 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
-    <div><dt>Status</dt><dd>M2 green, 126 tests</dd></div>
+    <div><dt>Status</dt><dd>M3 green, 136 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
     <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
     <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
@@ -373,10 +373,10 @@ footer b{color:var(--ink-2);font-weight:600}
 │   ├── view2d/
 │   │   ├── <b>vectors.js</b>        <i>built &middot; arrows, leaders, force-to-length scaling</i>
 │   │   ├── <b>side.js</b>           <i>built &middot; elevation, the twelve contacts placed on anatomy</i>
-│   │   └── <b>plan.js</b>           <i>M3 &middot; overhead, lateral channels and yaw</i>
+│   │   └── <b>plan.js</b>           <i>built &middot; overhead, lateral channels and tyre load</i>
 │   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gated, may be cut</i>
 │   ├── ui/
-│   │   ├── <b>controls.js</b>       <i>M3 &middot; sliders, playback transport</i>
+│   │   ├── <b>controls.js</b>       <i>built &middot; five sliders, surface, live traction gauge</i>
 │   │   └── <b>assumptions.js</b>    <i>built &middot; the provenance drawer</i>
 │   ├── <b>scenarios.js</b>          <i>M4 &middot; scripted maneuvers as input timelines</i>
 │   ├── <b>m0-report.js</b>          <i>built &middot; headless harness, kept past M1 — see note</i>
@@ -389,7 +389,8 @@ footer b{color:var(--ink-2);font-weight:600}
 and mindmap rather than the app-local path this document first predicted:</i>
 tests/loadpath/<b>model.test.js</b>        <i>third-law audit, ellipse bounds, load transfer</i>
 tests/loadpath/<b>touchpoints.test.js</b>  <i>the register: sign constraints, what is loaded at rest</i>
-tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, and whether it picks the answer a body would</i></pre>
+tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, and whether it picks the answer a body would</i>
+<i>grade lives in model.test.js, since it is a change to gravity rather than a new module</i></pre>
 
   <div class="note" style="margin-top:22px"><b>One prediction in this document reversed at M1</b>
   This plan said the headless report would be deleted once <code>app.js</code> arrived. It has been kept. It is the only thing that prints the unsourced constants on every run, it needs no browser, and deleting a working verification tool because a document predicted its removal is exactly the plan-over-reality mistake this project keeps trying to avoid. The document was wrong; the tool stays.</div>
@@ -404,7 +405,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <div class="ms-row done"><span class="ms-id">M0</span><div class="ms-b"><h3>Model core, headless</h3><p>Vehicle and occupant solvers with unit tests. The third-law audit in equation 6 must pass to floating-point tolerance before any view exists. <b>Done.</b> 57 tests green; worst third-law residual across ten scenarios is 2.5&times;10<sup>&minus;13</sup>&nbsp;N. Run it with <code>make loadpath-report</code>.</p></div><span class="ms-out">console table<br>57 tests green</span></div>
     <div class="ms-row done"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled. <b>Done.</b> All twelve contacts placed on real anatomy, each selectable, each showing both directions of its force pair. Run it with <code>make loadpath</code>.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
     <div class="ms-row done"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source. <b>Done.</b> Solved through the dual, so a fourteen-variable program becomes a three-variable convex minimisation. Balance closes to under 10<sup>&minus;5</sup>&nbsp;N across the whole envelope. Two things went beyond what this plan specified &mdash; see below.</p></div><span class="ms-out">live force split<br>126 tests green</span></div>
-    <div class="ms-row"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so.</p></div><span class="ms-out">2 views<br>5 inputs</span></div>
+    <div class="ms-row done"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so. <b>Done.</b> Grade is real rather than faked: gravity tilts into the cabin, which is why a hill presses you into the seat back while standing still. The plan view also surfaces the per-corner tyre loads the vehicle solver has computed since M0 and nothing had ever drawn.</p></div><span class="ms-out">2 views<br>5 inputs + surface</span></div>
     <div class="ms-row"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
     <div class="ms-row"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
     <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
@@ -477,6 +478,8 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 <tr><td>Contact stiffnesses</td><td>seat pan 45 kN/m down to steering rim 3 kN/m</td><td>Effective path stiffness, tuned so the rest split matches seated-pressure findings</td><td>Placeholder; ratios matter, absolutes do not</td></tr>
 <tr><td>Bracing capacity</td><td>rim 120 N, footrest 250 N, knee 250 N, armrest 60 N, brake pedal 400 N</td><td>Typical voluntary effort, not maximum capacity</td><td>Placeholder; sets when the belts engage</td></tr>
 <tr><td>Seat-surface friction</td><td>not modelled</td><td>A cone constraint, needs a different solver</td><td>Omission; pushes load onto bolster and belt</td></tr>
+<tr><td>Road grade</td><td>&plusmn;20% adjustable</td><td>Gravity tilted into the cabin frame, exact for a static tilt</td><td>Design choice</td></tr>
+<tr><td>Pedal demand</td><td>brake to 1.1 g, throttle to 0.45 g</td><td>Driver input in g, summed into one longitudinal demand</td><td>Design choice</td></tr>
 <tr><td>Body response lag</td><td>&tau; = 0.15 s, first order</td><td>Placeholder, tune against ride studies</td><td>Placeholder</td></tr>
 </tbody>
 </table>
