@@ -15,10 +15,12 @@
 require('./model/constants.js');
 require('./model/vehicle.js');
 require('./model/occupant.js');
+require('./model/contacts.js');
 
 const C = globalThis.LoadPathConstants;
 const V = globalThis.LoadPathVehicle;
 const O = globalThis.LoadPathOccupant;
+const K = globalThis.LoadPathContacts;
 const G = C.G;
 
 function arg(name, fallback) {
@@ -65,14 +67,15 @@ console.log('');
 
 console.log('  VEHICLE STATE');
 console.log('  ' + rule('-', 96));
-console.log('  ' + S('Scenario', 22) + S('km/h', 7) + S('ax (g)', 9) + S('ay (g)', 9) +
+console.log('  ' + S('Scenario', 24) + S('km/h', 7) + S('ax (g)', 9) + S('ay (g)', 9) +
             S('friction', 10) + S('radius', 10) + S('status', 20));
 console.log('  ' + rule('-', 96));
 
 const solved = SCENARIOS.map(sc => {
   const state = V.solve({ speed: sc.speed, steerAngle: sc.steerAngle, ax: sc.ax, mu: surface.mu }, car);
   const occ = O.solve({ bodyMass: driver.mass, accel: state.accel });
-  return { sc, state, occ };
+  const split = K.solve(occ.carOnBody);
+  return { sc, state, occ, split };
 });
 
 for (const { sc, state } of solved) {
@@ -81,7 +84,7 @@ for (const { sc, state } of solved) {
   let status = 'ok';
   if (state.tractionExceeded) status = 'TRACTION EXCEEDED';
   if (state.corners.wheelsLifted.length) status = 'WHEEL LIFT';
-  console.log('  ' + S(sc.name, 22) + N(sc.speed * 3.6, 5, 0) + '  ' +
+  console.log('  ' + S(sc.name, 24) + N(sc.speed * 3.6, 5, 0) + '  ' +
     N(state.accel.x / G, 8, 2) + ' ' + N(state.accel.y / G, 8, 2) + ' ' +
     N(state.utilisation * 100, 8, 0) + '%  ' + S(radius, 10) + S(status, 20));
 }
@@ -89,7 +92,7 @@ for (const { sc, state } of solved) {
 console.log('');
 console.log('  TYRE LOADS (N per corner)');
 console.log('  ' + rule('-', 96));
-console.log('  ' + S('Scenario', 22) + S('front L', 11) + S('front R', 11) +
+console.log('  ' + S('Scenario', 24) + S('front L', 11) + S('front R', 11) +
             S('rear L', 11) + S('rear R', 11) + S('sum', 11) + S('vs weight', 12));
 console.log('  ' + rule('-', 96));
 
@@ -97,7 +100,7 @@ const weight = car.mass * G;
 for (const { sc, state } of solved) {
   const L = state.corners.loads;
   const err = state.corners.total - weight;
-  console.log('  ' + S(sc.name, 22) + N(L.frontLeft, 9) + '  ' + N(L.frontRight, 9) + '  ' +
+  console.log('  ' + S(sc.name, 24) + N(L.frontLeft, 9) + '  ' + N(L.frontRight, 9) + '  ' +
     N(L.rearLeft, 9) + '  ' + N(L.rearRight, 9) + '  ' + N(state.corners.total, 9) + '  ' +
     S(Math.abs(err) < 1e-6 ? 'exact' : err.toExponential(1), 12));
 }
@@ -105,18 +108,62 @@ for (const { sc, state } of solved) {
 console.log('');
 console.log(`  FORCES ON AND FROM THE DRIVER (${driver.mass} kg)`);
 console.log('  ' + rule('-', 96));
-console.log('  ' + S('Scenario', 22) + S('g-load', 9) + S('car->body (N)', 30) +
+console.log('  ' + S('Scenario', 24) + S('g-load', 9) + S('car->body (N)', 30) +
             S('body->car (N)', 30));
 console.log('  ' + rule('-', 96));
 
 for (const { sc, occ } of solved) {
   const f = occ.carOnBody, r = occ.bodyOnCar;
   const fmt = v => `(${N(v.x, 6)},${N(v.y, 6)},${N(v.z, 6)} )`;
-  console.log('  ' + S(sc.name, 22) + N(occ.gLoad, 6, 2) + '   ' + S(fmt(f), 30) + S(fmt(r), 30));
+  console.log('  ' + S(sc.name, 24) + N(occ.gLoad, 6, 2) + '   ' + S(fmt(f), 30) + S(fmt(r), 30));
 }
 
 console.log('');
-console.log('  NEWTON THIRD LAW AUDIT — the gate for this milestone');
+console.log('  WHERE THE FORCE ENTERS THE BODY (N per contact)');
+console.log('  ' + rule('-', 96));
+console.log('  The browser view shows one state. This is the solver across all of them,');
+console.log('  which is where it earns or loses trust. Blank means that contact carries');
+console.log('  nothing. * marks a channel driven to its bracing limit.');
+console.log('');
+
+const CONTACT_ORDER = ['seat_pan', 'seat_back', 'bolster', 'lap_belt', 'shoulder_belt',
+                       'wheel', 'pedal', 'footrest', 'floor', 'knee_bolster',
+                       'head_restraint', 'armrest'];
+const SHORT = { seat_pan: 'pan', seat_back: 'back', bolster: 'bolst', lap_belt: 'lap',
+                shoulder_belt: 'shldr', wheel: 'wheel', pedal: 'pedal', footrest: 'foot',
+                floor: 'floor', knee_bolster: 'knee', head_restraint: 'head', armrest: 'arm' };
+
+console.log('  ' + S('Scenario', 24) + CONTACT_ORDER.map(k => S(SHORT[k], 7)).join(''));
+console.log('  ' + rule('-', 96));
+for (const { sc, occ, split } of solved) {
+  if (!split.feasible) { console.log('  ' + S(sc.name, 24) + 'INFEASIBLE'); continue; }
+  const cells = CONTACT_ORDER.map(k => {
+    const t = split.byTouchpoint[k];
+    if (!t || t.magnitude < 0.5) return S('.', 7);
+    const sat = split.channels.some(c => c.touchpoint === k && c.saturated) ? '*' : ' ';
+    return S(Math.round(t.magnitude) + sat, 7);
+  });
+  console.log('  ' + S(sc.name, 24) + cells.join(''));
+}
+
+console.log('');
+console.log('  ' + S('Scenario', 24) + S('belt engaged', 15) + S('balance residual', 20) + S('iterations', 12));
+console.log('  ' + rule('-', 96));
+let worstBal = 0;
+for (const { sc, occ, split } of solved) {
+  if (!split.feasible) continue;
+  const bal = K.auditBalance(split, occ.carOnBody);
+  if (bal.residual > worstBal) worstBal = bal.residual;
+  console.log('  ' + S(sc.name, 24) + S(split.slackEngaged ? 'yes' : 'no', 15) +
+              S(bal.residual.toExponential(2) + ' N', 20) + S(String(split.iterations), 12));
+}
+console.log('');
+console.log(`  The split re-sums to the whole-body requirement in every scenario; worst`);
+console.log(`  residual ${worstBal.toExponential(2)} N. No contact pulls when it can only push, and no`);
+console.log(`  bracing channel exceeds its limit — both hold by construction, not by check.`);
+
+console.log('');
+console.log('  NEWTON THIRD LAW AUDIT — the gate for M0');
 console.log('  ' + rule('-', 96));
 let worst = 0, worstName = '';
 for (const { sc, occ } of solved) {

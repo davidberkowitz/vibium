@@ -171,27 +171,46 @@
     el('circle', { cx: COM.x, cy: COM.y, r: 3.6, fill: 'var(--act)' }, g);
   }
 
-  function drawContacts(g, onSelect) {
+  /* Marker size carries load. A contact taking 489 N should not look the same
+     as one taking nothing, and sizing the dot says so without adding twelve
+     more arrows to an already busy drawing. Square-rooted for the same reason
+     arrow length is: keeps small loads visible and big ones on the page. */
+  function dotRadius(magnitude, maxMagnitude) {
+    if (!(magnitude > 0)) return 4;
+    var t = Math.sqrt(magnitude / Math.max(maxMagnitude, 1));
+    return 4.5 + 7 * t;
+  }
+
+  function drawContacts(g, onSelect, split) {
     var layer = el('g', { class: 'contacts' }, g);
+    var loads = {}, maxLoad = 0;
+    if (split && split.feasible) {
+      Object.keys(split.byTouchpoint).forEach(function (k) {
+        loads[k] = split.byTouchpoint[k].magnitude;
+        if (loads[k] > maxLoad) maxLoad = loads[k];
+      });
+    }
     T.ALL.forEach(function (tp) {
       var p = POINTS[tp.id];
       var lab = LABELS[tp.id];
       if (!p || !lab) return;
 
+      var load = loads[tp.id] || 0;
+      var carrying = load > 0.5;
       var anchorX = lab.side === 'left' ? LEFT_X : RIGHT_X;
       var item = el('g', {
-        class: 'contact' + (tp.activeAtRest ? ' is-active' : ' is-idle'),
+        class: 'contact' + (carrying ? ' is-active' : ' is-idle'),
         'data-id': tp.id, tabindex: '0', role: 'button',
         'aria-label': tp.n + ' ' + tp.label + ', ' +
-          (tp.activeAtRest ? 'carrying load at rest' : 'not loaded at rest')
+          (carrying ? 'carrying ' + Math.round(load) + ' newtons' : 'carrying no load')
       }, layer);
 
       V.leader(item, anchorX, lab.y - 4, p.x, p.y, lab.side);
 
       if (tp.id === 'bolster') {
-        V.intoPage(item, p.x, p.y, 10, 'var(--act)');
+        V.intoPage(item, p.x, p.y, carrying ? 11 : 9, 'var(--act)');
       } else {
-        el('circle', { cx: p.x, cy: p.y, r: 5.5, class: 'dot' }, item);
+        el('circle', { cx: p.x, cy: p.y, r: dotRadius(load, maxLoad), class: 'dot' }, item);
       }
 
       var t = text('', {
@@ -202,6 +221,10 @@
       num.textContent = tp.n + '  ';
       var name = el('tspan', null, t);
       name.textContent = tp.label + (tp.id === 'bolster' ? '  ⊗' : '');
+      if (carrying) {
+        var f = el('tspan', { class: 'contact-force' }, t);
+        f.textContent = '   ' + Math.round(load) + ' N';
+      }
 
       if (onSelect) {
         item.addEventListener('mouseenter', function () { onSelect(tp.id); });
@@ -215,7 +238,7 @@
     return layer;
   }
 
-  function render(mount, state, onSelect) {
+  function render(mount, state, onSelect, split) {
     mount.innerHTML = '';
     var svg = el('svg', {
       viewBox: '0 0 ' + W + ' ' + H, class: 'side-view', role: 'img',
@@ -228,7 +251,7 @@
     drawCar(scene);
     drawBody(scene);
     drawBaselineForces(scene, state);
-    var contacts = drawContacts(scene, onSelect);
+    var contacts = drawContacts(scene, onSelect, split);
 
     return {
       svg: svg,

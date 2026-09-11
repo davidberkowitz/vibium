@@ -1,4 +1,5 @@
-/* Driver Load Path — M1. Side elevation at the cruise baseline.
+/* Driver Load Path — M2. Side elevation at the cruise baseline, with the
+   force split solved and every number carrying its source.
 
    The whole app at this milestone is one static state: a car going straight at
    a steady speed, which for the occupant is indistinguishable from a car parked
@@ -9,9 +10,14 @@
    read against, and it is where the counter-intuitive bit lives: the g-load
    here is 1.00, not 0. You always feel your own weight.
 
-   What this milestone deliberately does NOT do is divide the total across the
-   twelve contacts. That split is statically indeterminate and is milestone 2.
-   Rather than show a plausible-looking placeholder, the panel says so.
+   As of M2 the total IS divided across the twelve contacts, by the solver in
+   model/contacts.js. At rest the answer is unsurprising and that is the point:
+   about sixty percent through the seat pan, nothing at all in the belts,
+   nothing lateral. It is the reference every loaded case is read against.
+
+   The provenance drawer ships in the same milestone as the solver, because
+   this is the moment the page starts putting authoritative-looking newtons
+   next to body parts.
 */
 (function (global) {
   'use strict';
@@ -19,7 +25,9 @@
   var C = global.LoadPathConstants;
   var O = global.LoadPathOccupant;
   var T = global.LoadPathTouchpoints;
+  var K = global.LoadPathContacts;
   var Side = global.LoadPathSideView;
+  var Assumptions = global.LoadPathAssumptions;
 
   var CAR = C.VEHICLES.sedan;
   var DRIVER = C.OCCUPANTS.m50;
@@ -27,6 +35,12 @@
 
   var view = null;
   var selectedId = null;
+  var split = null;
+
+  function load(id) {
+    var t = split && split.feasible && split.byTouchpoint[id];
+    return t ? t.magnitude : 0;
+  }
 
   function n1(x) { return x.toFixed(1); }
 
@@ -41,11 +55,19 @@
     var box = document.getElementById('state-rows');
     box.innerHTML = '';
     var audit = O.auditThirdLaw(state);
+    var bal = split && split.feasible ? K.auditBalance(split, state.carOnBody) : null;
+    var loaded = split && split.feasible
+      ? Object.keys(split.byTouchpoint).filter(function (k) {
+          return split.byTouchpoint[k].magnitude > 0.5; }).length
+      : 0;
     var rows = [
       ['Apparent g-load', state.gLoad.toFixed(2) + ' g', 'a parked car is 1 g, not 0'],
       ['Car → driver', n1(state.carOnBody.z) + ' N up', 'total across all contacts'],
       ['Driver → car', n1(Math.abs(state.bodyOnCar.z)) + ' N down', 'the exact negative'],
       ['Third-law residual', audit.worst.toExponential(1) + ' N', 'checked, not assumed'],
+      ['Contacts carrying load', loaded + ' of 12', 'the rest are idle or slack'],
+      ['Split balance residual', bal ? bal.residual.toExponential(1) + ' N' : '—',
+       'the split re-sums to the total'],
       ['Driver share of mass', (DRIVER.mass / CAR.mass * 100).toFixed(1) + ' %',
        DRIVER.mass + ' kg in a ' + CAR.mass + ' kg car']
     ];
@@ -80,14 +102,23 @@
   function renderContacts() {
     var box = document.getElementById('contact-rows');
     box.innerHTML = '';
+    var maxLoad = 1;
+    T.ALL.forEach(function (tp) { maxLoad = Math.max(maxLoad, load(tp.id)); });
     T.ALL.forEach(function (tp) {
-      var row = el('div', 'row contact-row' + (tp.activeAtRest ? ' on' : ' off'));
+      var row = el('div', 'row contact-row' + (load(tp.id) > 0.5 ? ' on' : ' off'));
       row.setAttribute('data-id', tp.id);
       row.setAttribute('tabindex', '0');
       row.appendChild(el('span', 'n', tp.n));
       row.appendChild(el('span', 'k', tp.label));
       row.appendChild(el('span', 'pill ' + tp.constraint, tp.constraint));
-      row.appendChild(el('span', 'state', tp.activeAtRest ? 'loaded' : 'idle'));
+      var f = load(tp.id);
+      var v = el('span', 'v force', f > 0.5 ? n1(f) + ' N' : '—');
+      row.appendChild(v);
+      var barWrap = el('span', 'bar');
+      var bar = el('i');
+      bar.style.width = (f > 0.5 ? (f / maxLoad * 100) : 0).toFixed(1) + '%';
+      barWrap.appendChild(bar);
+      row.appendChild(barWrap);
       row.addEventListener('mouseenter', function () { select(tp.id); });
       row.addEventListener('focus', function () { select(tp.id); });
       row.addEventListener('click', function () { select(tp.id); });
@@ -120,10 +151,33 @@
     pair.appendChild(a); pair.appendChild(b);
     box.appendChild(pair);
 
+    var f = load(tp.id);
+    var fr = el('div', 'detail-force' + (f > 0.5 ? '' : ' idle'));
+    fr.appendChild(el('span', 'fv', f > 0.5 ? n1(f) + ' N' : 'no load'));
+    fr.appendChild(el('span', 'fl', f > 0.5
+      ? 'right now, in this state'
+      : 'nothing crosses this contact in the cruise baseline'));
+    box.appendChild(fr);
+
+    if (split && split.feasible) {
+      var chans = (split.byTouchpoint[tp.id] || {}).channels || [];
+      var caps = split.channels.filter(function (ch) {
+        return ch.touchpoint === tp.id && ch.saturated; });
+      if (caps.length) {
+        box.appendChild(el('p', 'muted',
+          'At its bracing limit. A driver can only push so hard here, so any ' +
+          'further load goes somewhere else.'));
+      }
+      if (chans.length > 1) {
+        box.appendChild(el('p', 'muted',
+          'Modelled as ' + chans.length + ' channels: ' + chans.join(', ') + '.'));
+      }
+    }
+
     var meta = el('div', 'meta');
     meta.appendChild(el('span', null, 'axis: ' + tp.axis));
     meta.appendChild(el('span', null, 'dominant in: ' + tp.dominantRegime));
-    meta.appendChild(el('span', null, tp.activeAtRest ? 'loaded at rest' : 'idle at rest'));
+    meta.appendChild(el('span', null, tp.constraint));
     box.appendChild(meta);
     if (tp.gated) box.appendChild(el('p', 'muted', tp.gated));
   }
@@ -154,11 +208,15 @@
 
   function boot() {
     var state = O.solve({ bodyMass: DRIVER.mass, accel: REST });
+    split = K.solve(state.carOnBody);
 
     document.getElementById('readout').textContent =
       CAR.label + ' · ' + DRIVER.label + ' · steady cruise, zero acceleration';
 
-    view = Side.render(document.getElementById('figure'), state, function (id) { select(id); });
+    Assumptions.mount(document.body, document.getElementById('btn-assumptions'));
+
+    view = Side.render(document.getElementById('figure'), state,
+                       function (id) { select(id); }, split);
     renderState(state);
     renderSegments(state);
     renderContacts();

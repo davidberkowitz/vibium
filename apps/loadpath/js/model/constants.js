@@ -115,6 +115,53 @@
               'distribution. This is a deliberate simplification and it is the ' +
               'reason per-corner loads should be read as indicative.'
     },
+    'MODEL.contactStiffness': {
+      unit: 'N/m', status: 'placeholder',
+      source: 'Effective PATH stiffness for each contact channel, standing for the ' +
+              'whole series chain from car structure through trim into the body ' +
+              'segment. Tuned so the rest-state distribution matches published ' +
+              'seated-pressure findings, roughly 60% through the seat pan.',
+      caveat: 'These are not measured component stiffnesses and must not be quoted ' +
+              'as such. Only their RATIOS shape the force split; the absolute values ' +
+              'are arbitrary. Replacing them with real measured values would change ' +
+              'every per-contact number on screen.'
+    },
+    'MODEL.bracingCaps': {
+      unit: 'N', status: 'placeholder',
+      source: 'Ceiling on how hard a driver drives each voluntary bracing channel: ' +
+              'steering rim 120 N, footrest 250 N, knee bolster 250 N, armrest 60 N, ' +
+              'brake pedal 400 N. Structural channels (foam, floor, webbing) have none.',
+      caveat: 'These are TYPICAL voluntary effort, not maximum capacity — a driver in ' +
+              'a panic stop is braking and steering, not performing a maximal leg ' +
+              'press. They set the deceleration at which the belts engage, so they ' +
+              'move the single most visible result in the model. Unvalidated.'
+    },
+    'MODEL.slackRule': {
+      status: 'design',
+      source: 'Belts and the head restraint carry load only when the gap-free ' +
+              'channels cannot supply the required force on their own.',
+      caveat: 'This model is quasi-static and does not track body displacement, so ' +
+              'it cannot compute slack take-up properly. The rule gets the two ends ' +
+              'right (nothing in the belt going straight, belt engaged in hard ' +
+              'braking) but the transition is a step, not the gradual take-up a real ' +
+              'belt has.'
+    },
+    'MODEL.seatFriction': {
+      status: 'placeholder',
+      source: 'Friction at the seat surface is NOT modelled. Only surface normals carry load.',
+      caveat: 'Friction is bounded by the normal force it accompanies, which is a cone ' +
+              'constraint rather than a simple limit, and it would need a different ' +
+              'solver. Its absence pushes fore-aft and lateral load onto the bolster, ' +
+              'belt and bracing channels, which therefore read high.'
+    },
+    'MODEL.occupantAsPoint': {
+      status: 'design',
+      source: 'The force split treats the occupant as a single point mass.',
+      caveat: 'A real body is a linkage: where load goes depends on limb geometry, not ' +
+              'only on contact stiffness. This is why the stiffnesses had to be tuned ' +
+              'to a known answer rather than measured — they are absorbing the ' +
+              'kinematics the point-mass model throws away.'
+    },
     'MODEL.corneringModel': {
       status: 'design',
       source: 'Steady-state bicycle model with a constant understeer gradient.',

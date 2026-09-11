@@ -3,8 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M1 built and green.** The model core and the side elevation both run, with 69 passing
-tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M2 built and green.** The model core, the side elevation and the contact force solver
+all run, with 126 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -39,12 +39,51 @@ proportions, so the "female" preset is a scaled male. The caveat now travels wit
 `constants.js` and prints on every report run. It must be resolved before those presets reach a
 user-facing control.
 
-## The hard part
+## The hard part, now solved
 
 The total force on the occupant is determined by Newton's second law. The *split* of that force
 across bolster, belt, footrest, knee and wheel is not — the system is statically indeterminate.
-The plan resolves it as a stiffness-weighted least-norm problem with unilateral sign constraints,
-because foam cannot pull and webbing cannot push. That solver is milestone 2, not milestone 6.
+Nothing errors when you ignore that; your code just returns whichever distribution an arbitrary
+code path happened to pick.
+
+`js/model/contacts.js` resolves it by minimum stored elastic energy, subject to what each contact
+can physically do: foam pushes but never pulls, webbing pulls but never pushes, and a driver can
+only brace so hard. That makes it a quadratic program rather than a linear solve.
+
+It is not solved with a QP library. Substituting `lambda = sqrt(k) * z` turns the objective into a
+plain minimum-norm problem, whose optimality conditions collapse to `z = clamp(A' y, 0, cap)` for
+some `y` in three dimensions. So fourteen unknowns become a function of three, and what is left is
+an unconstrained convex minimisation solved by Newton in tens of iterations. Non-negativity and
+the caps hold **by construction** — they are not checked afterwards, they cannot be violated.
+
+What that buys, visibly: the belts carry exactly zero in a car going straight, bracing absorbs a
+gentle stop, and in a hard stop the bracing saturates and the shoulder belt becomes the single
+largest contact on the body.
+
+```
+Scenario                pan    back   bolst  lap    shldr  wheel  pedal  foot   floor  knee
+Parked                  489    63     .      .      .      33     57     61     54     .
+Brisk left bend         489    63     161    .      .      33     57     61     54     226
+Firm braking            367    8      79     12     467    52     52     60     41     .
+Panic stop              371    .      91     118    537    61     55     64     41     .
+```
+
+Run `make loadpath-report` for the whole table. `*` marks a channel driven to its bracing limit.
+
+## Every number carries its source
+
+The provenance drawer ships in the same milestone as the solver, on purpose. This is the moment
+the page starts putting authoritative-looking newtons next to body parts, and most of the numbers
+behind them are tuned placeholders. The drawer reads the provenance registry directly, so a
+constant added without a record shows up as a gap on screen rather than passing unnoticed.
+
+![The assumptions drawer](images/09-m2-assumptions-drawer.png)
+
+Two departures from the plan happened here, both recorded in it. The solver ended up
+box-constrained rather than merely unilateral, because without a ceiling on bracing it concludes
+the belts never carry anything. And the stiffnesses had to be tuned to a known answer rather than
+measured, because a point-mass occupant discards the limb geometry that really decides where load
+goes — they are absorbing kinematics the model does not have.
 
 ## Milestones
 
@@ -52,8 +91,8 @@ because foam cannot pull and webbing cannot push. That solver is milestone 2, no
 |---|---|---|
 | **M0** | Model core, headless | **done** — 57 tests |
 | **M1** | Side elevation, cruise baseline | **done** — 12 tests |
-| M2 | Contact solver and provenance drawer | next |
-| M3 | Plan view and live sliders | |
+| **M2** | Contact solver and provenance drawer | **done** — 57 tests |
+| M3 | Plan view and live sliders | next |
 | M4 | Scripted playback | |
 | M5 | Vibration overlay | |
 | M6 | 3D toggle | gated, may be cut |
@@ -69,7 +108,7 @@ make test-loadpath      # 69 unit tests
 make loadpath-report    # the headless model report, no browser needed
 ```
 
-![The side elevation at the cruise baseline](images/05-m1-side-elevation.png)
+![The force split at the cruise baseline](images/08-m2-force-split.png)
 
 M1 is the reference state: a car going straight at a steady speed, which for the occupant is
 indistinguishable from a car parked on level ground. Acceleration is zero, so every loaded

@@ -10,9 +10,10 @@
 <body>
   <header id="toolbar">
     <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
-    <span class="milestone">M1 · cruise baseline</span>
+    <span class="milestone">M2 · cruise baseline</span>
     <div class="spacer"></div>
     <span id="readout" class="readout"></span>
+    <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
   </header>
 
   <main id="stage">
@@ -30,9 +31,12 @@
         Steady cruise. Acceleration is zero, so every contact is doing one job:
         holding the driver up. The two coloured arrows are the same force read
         in opposite directions — that is Newton's third law, not an artistic
-        choice. Where that total divides across the twelve contacts is
-        <strong>not modelled yet</strong>; the split is statically indeterminate
-        and is milestone 2.
+        choice. The number beside each contact is its share of that total,
+        solved rather than assumed: the split is statically indeterminate, so
+        it is picked by <strong>minimum stored elastic energy subject to what
+        each contact can physically do</strong>. Foam cannot pull, webbing
+        cannot push, and a driver can only brace so hard. Marker size follows
+        load.
       </p>
     </section>
 
@@ -63,6 +67,10 @@
 
       <section>
         <h2>Numbers you should not quote yet</h2>
+        <p class="muted">
+          The force split leans on these first. Full list in
+          <strong>Assumptions</strong>, top right.
+        </p>
         <div id="caveats"></div>
       </section>
     </aside>
@@ -72,8 +80,10 @@
   <script src="js/model/touchpoints.js"></script>
   <script src="js/model/vehicle.js"></script>
   <script src="js/model/occupant.js"></script>
+  <script src="js/model/contacts.js"></script>
   <script src="js/view2d/vectors.js"></script>
   <script src="js/view2d/side.js"></script>
+  <script src="js/ui/assumptions.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
