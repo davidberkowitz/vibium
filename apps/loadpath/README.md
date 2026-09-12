@@ -249,11 +249,54 @@ right number rendered plainly, because the polish buys it credibility it hasn't 
 
 ## Running it
 
+No build step and no dependencies to install. You need **Python 3** to serve the app and
+**Node 18+** for the tests and the report — nothing else.
+
+### macOS and Linux
+
 ```bash
 make loadpath           # serve the app on http://localhost:8081
 make test-loadpath      # 191 unit tests
 make loadpath-report    # the headless model report, no browser needed
 ```
+
+### Windows (PowerShell)
+
+Windows has no `make`, so run the same three commands directly. Each `make` target above is a
+one-liner; these are those one-liners.
+
+```powershell
+# serve the app, then open http://localhost:8081
+cd apps\loadpath
+python -m http.server 8081
+```
+
+```powershell
+# from the repository root
+node --test tests/loadpath/model.test.js tests/loadpath/touchpoints.test.js tests/loadpath/contacts.test.js tests/loadpath/scenarios.test.js tests/loadpath/vibration.test.js
+
+node apps/loadpath/js/m0-report.js
+```
+
+Forward slashes are fine for Node on Windows. If `python` is not found, try `py -m http.server
+8081`, or use Node instead: `npx --yes http-server apps/loadpath -p 8081`.
+
+**Or skip the server entirely** and open `apps\loadpath\index.html` directly in a browser. The
+app makes no network requests of any kind — no `fetch`, no `XMLHttpRequest`, no ES modules, just
+plain `<script>` tags — so `file://` works. The only thing you lose is shareable deep links.
+
+### Once it is open
+
+| | |
+|---|---|
+| Sliders | speed, steering, brake, throttle, grade |
+| Scenario chips | steady cruise, lane change, threshold stop, hill start &mdash; then press play |
+| Scrub bar | drag to any moment in a maneuver |
+| Roughness A&ndash;E | drives the vibration panel and spectrum only, never a force |
+| Click any contact | what crosses it, in both directions |
+| Assumptions, top right | every number that is not fully sourced |
+
+Deep links: `?play=threshold_stop`, `?select=bolster`, `?speed=25&steerAngle=0.045`.
 
 ![Cornering, with both views live](images/10-m3-cornering.png)
 
