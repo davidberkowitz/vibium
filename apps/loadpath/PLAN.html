@@ -174,7 +174,7 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>F &middot; M4 built</dd></div>
+    <div><dt>Revision</dt><dd>G &middot; M5 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
     <div><dt>Status</dt><dd>M3 green, 136 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
@@ -369,11 +369,12 @@ footer b{color:var(--ink-2);font-weight:600}
 │   │   ├── <b>vehicle.js</b>        <i>built &middot; EQ 1–4: cornering, load transfer, friction ellipse</i>
 │   │   ├── <b>occupant.js</b>       <i>built &middot; EQ 5–6: segment masses, required force, third-law audit</i>
 │   │   ├── <b>contacts.js</b>       <i>built &middot; the QP: box-constrained least-norm force split</i>
-│   │   └── <b>vibration.js</b>      <i>M5 &middot; EQ 7: Wk/Wd weighting, ISO comfort banding</i>
+│   │   └── <b>vibration.js</b>      <i>built &middot; M5 &middot; EQ 7: road PSD, quarter car, Wk/Wd, comfort banding</i>
 │   ├── view2d/
 │   │   ├── <b>vectors.js</b>        <i>built &middot; arrows, leaders, force-to-length scaling</i>
 │   │   ├── <b>side.js</b>           <i>built &middot; elevation, the twelve contacts placed on anatomy</i>
-│   │   └── <b>plan.js</b>           <i>built &middot; overhead, lateral channels and tyre load</i>
+│   │   ├── <b>plan.js</b>           <i>built &middot; overhead, lateral channels and tyre load</i>
+│   │   └── <b>spectrum.js</b>       <i>built &middot; M5 &middot; the weighted spectrum, in its own hue</i>
 │   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gated, may be cut</i>
 │   ├── ui/
 │   │   ├── <b>controls.js</b>       <i>built &middot; five sliders, surface, live traction gauge</i>
@@ -407,7 +408,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <div class="ms-row done"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source. <b>Done.</b> Solved through the dual, so a fourteen-variable program becomes a three-variable convex minimisation. Balance closes to under 10<sup>&minus;5</sup>&nbsp;N across the whole envelope. Two things went beyond what this plan specified &mdash; see below.</p></div><span class="ms-out">live force split<br>126 tests green</span></div>
     <div class="ms-row done"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so. <b>Done.</b> Grade is real rather than faked: gravity tilts into the cabin, which is why a hill presses you into the seat back while standing still. The plan view also surfaces the per-corner tyre loads the vehicle solver has computed since M0 and nothing had ever drawn.</p></div><span class="ms-out">2 views<br>5 inputs + surface</span></div>
     <div class="ms-row done"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous. <b>Done.</b> Playback is not a second code path &mdash; it is the same chain with its inputs coming from a clock. The lag sits between vehicle and occupant, so mid-maneuver the two drawings deliberately disagree and the gap is printed. It is a transient and nothing else: settled states are identical with it on or off, asserted to 1e&minus;6&nbsp;N per contact, and the frame loop stops requesting frames once it settles.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
-    <div class="ms-row"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
+    <div class="ms-row done"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver. <b>Done.</b> ISO 8608 road class and speed into a displacement PSD, a quarter car and a seat mode to the occupant, Wk and Wd evaluated as continuous transfer functions, then a band-limited RMS and EQ 7. The separation is enforced by a test rather than by intent: changing the road class must move no contact force by a single newton.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
     <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
   </div>
   <div class="note" style="margin-top:24px"><b>Two departures from this plan at M2</b>
@@ -442,7 +443,10 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <p class="fix"><em>Mitigation</em>Equation 4 evaluated as one test on the resultant, with a test case that asserts the diagonal case fails.</p></div>
   <div class="risk"><h3>Vibration and steady-state are different mathematics</h3>
     <p>Load transfer is a time-domain quasi-static balance. Whole-body vibration is a frequency-domain weighted RMS over an exposure window. Merging them into one solver produces a mess that satisfies neither.</p>
-    <p class="fix"><em>Mitigation</em>Keep vibration as a separate overlay channel with its own units and its own panel. Do not average a comfort index into a force arrow.</p></div>
+    <p class="fix"><em>Mitigation</em>Keep vibration as a separate overlay channel with its own units and its own panel. Do not average a comfort index into a force arrow. <b>Held at M5, and enforced rather than intended:</b> the vibration solver takes the speed and the road class and nothing else, and a test asserts that stepping the road class from A to E moves no contact force by a single newton. The channel also gets its own hue, because <i>&minus;&minus;act</i> and <i>&minus;&minus;react</i> encode direction of action on a force and vibration has no direction and is not a force.</p></div>
+  <div class="risk"><h3>A standards-labelled number is the easiest kind to overtrust</h3>
+    <p>The vibration chain has eight stages. Four are exact or standardised &mdash; the ISO 8608 PSD, the frequency transform, the double differentiation, the RMS. Two are the quarter car and the seat mode, which are representative textbook values rather than a measured vehicle. One is a guessed horizontal-to-vertical input ratio that EQ 7 then multiplies by 1.4. And the whole assembly has <strong>never been compared against a measured car</strong>, because the papers that would supply one were unreachable from this environment. The output still arrives wearing an ISO label and a comfort adjective.</p>
+    <p class="fix"><em>Mitigation</em>Tuning the placeholders until the output matched a remembered figure was considered and rejected &mdash; it would have destroyed the only useful property the number has, which is that nothing was bent to make it land anywhere. Instead the drawer carries a record saying the chain is unvalidated end to end, the panel reports the per-axis RMS and the horizontal share so a reader can see how much of the headline rests on the guess, and the spectrum is shown so the SHAPE, which is the trustworthy part, is what the eye reads first.</p></div>
   <div class="risk"><h3>The anthropometry has one body type in it</h3>
     <p>Building M0 surfaced a contradiction the plan did not have. The occupant presets offer a 5th percentile female, but the segment mass fractions every one of them is multiplied by come from Dempster's 1955 sample of nine male white cadavers. Changing the total mass does not change the proportions, so the "female" preset is a scaled male.</p>
     <p class="fix"><em>Mitigation</em>The caveat now travels with the numbers in the constants file and prints in the M0 report. Before the presets reach a user-facing control, either source sex-specific fractions or relabel the control as a mass slider and stop implying it models a different body.</p></div>
@@ -474,6 +478,9 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 <tr><td>Occupant mass</td><td>78 kg default</td><td>50th percentile male; 5th percentile female offered as alternate</td><td>Verify at M0</td></tr>
 <tr><td>Segment mass fractions</td><td>head+neck 8.1%, trunk 49.7%, thigh 10.0%, shank 4.65%, foot 1.45%</td><td>Dempster (1955), reproduced in Winter. Sample: nine male white cadavers</td><td>Corroborated; sums to 1.000 exactly, asserted in tests</td></tr>
 <tr><td>Vibration weighting</td><td>W<sub>k</sub> on z with k=1.0; W<sub>d</sub> on x and y with k=1.4</td><td>ISO 2631-1:1997</td><td>Verified by search</td></tr>
+<tr><td>Weighting filter parameters</td><td>W<sub>k</sub> f3=f4=12.5, Q4=0.63, f5=2.37, f6=3.35, Q5=Q6=0.91; W<sub>d</sub> f3=f4=2.0, Q4=0.63</td><td>Third-party implementation of ISO 2631-1</td><td>Corroborated; ISO's own one-third-octave table was egress blocked, so the curves are checked for structure only</td></tr>
+<tr><td>Road roughness classes</td><td>G<sub>d</sub>(n<sub>0</sub>) = 1, 4, 16, 64, 256 &times;10<sup>&minus;6</sup> m&sup3; for A&ndash;E; w = 2</td><td>ISO 8608</td><td>Corroborated by two searches; one secondary table found was internally inconsistent</td></tr>
+<tr><td>Quarter car and seat mode</td><td>Sprung 350 kg, unsprung 40 kg, 22 kN/m, 1500 N&middot;s/m, tyre 200 kN/m; seat 4.5 Hz</td><td>Representative passenger-car values</td><td>Placeholder &mdash; chain never validated against a measured vehicle</td></tr>
 <tr><td>Comfort banding</td><td>&le;0.315 not uncomfortable; 0.315&ndash;0.63 a little uncomfortable</td><td>ISO 2631-1:1997 comfort reactions scale</td><td>Verified by search</td></tr>
 <tr><td>Seated vertical resonance</td><td>4&ndash;6 Hz principal, falling with amplitude; 8&ndash;12 Hz second mode</td><td>Apparent-mass literature, seated whole-body vibration</td><td>Verified by search, corrected</td></tr>
 <tr><td>Friction ellipse</td><td>(F<sub>x</sub>/F<sub>x,max</sub>)&sup2; + (F<sub>y</sub>/F<sub>y,max</sub>)&sup2; = 1</td><td>Standard combined-slip tire model</td><td>Verified by search</td></tr>
@@ -548,7 +555,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 </section>
 
 <footer>
-  <p><b>Driver Load Path</b> &middot; build plan, revision F &middot; <b>apps/loadpath</b> in the vibium repository.</p>
+  <p><b>Driver Load Path</b> &middot; build plan, revision G &middot; <b>apps/loadpath</b> in the vibium repository.</p>
   <p style="margin-top:8px">Prepared by <b>David Berkowitz</b>. Research and drafting with <b>Anthropic Claude</b>. Illustrations to be generated with <b>Google Gemini Nano Banana</b>.</p>
 </footer>
 </div>

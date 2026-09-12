@@ -14,6 +14,12 @@
   --act: #f2716b;          /* car → driver */
   --react: #58a6ff;        /* driver → car */
   --warn: #d9a441;
+  /* The vibration channel. A third meaning-bearing hue, deliberately not --act
+     or --react: those two encode direction of action on a force, and vibration
+     has no direction and is not a force. Validated against this surface for the
+     lightness band, chroma floor, CVD separation and contrast. */
+  --vib: #8f6ee0;
+  --vib-soft: #6d55ab;
   --ok: #57ab5a;
   --toolbar-h: 46px;
   --panel-w: 380px;
@@ -426,3 +432,62 @@ button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--re
 }
 
 .plan-lat-label { font-size: 9.5px; }
+
+
+/* ---- M5 vibration: spectrum chart and ride panel ---- */
+#vib-block { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
+#spectrum { margin-top: 10px; }
+.spectrum { display: block; width: 100%; height: auto; }
+.spec-region { fill: var(--vib); opacity: .07; }
+.spec-region-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px;
+  fill: var(--fg-dim); letter-spacing: .04em;
+}
+.spec-axis { stroke: var(--line-strong); stroke-width: 1; }
+.spec-region-rule { stroke: var(--vib-soft); stroke-width: 1; opacity: .55; }
+.spec-grid { stroke: var(--line); stroke-width: 1; }
+.spec-tick {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px;
+  fill: var(--fg-dim);
+}
+.spec-weighted { stroke: var(--vib); stroke-width: 2; stroke-linejoin: round; }
+.spec-fill { fill: var(--vib); opacity: .14; stroke: none; }
+.spec-raw {
+  stroke: var(--vib-soft); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .95;
+}
+.spec-peak { fill: var(--vib); stroke: var(--bg); stroke-width: 2; }
+.spec-label { font-size: 10.5px; fill: var(--fg-dim); }
+.spec-label.weighted { fill: var(--fg); }
+.spec-sub { font-size: 9.5px; fill: var(--line-strong); }
+.spec-region { }
+.spec-hair { stroke: var(--fg-dim); stroke-width: 1; stroke-dasharray: 2 3; }
+.spec-tip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+  fill: var(--fg);
+}
+.spec-hit { cursor: crosshair; }
+
+.vib-row .v { color: var(--vib); }
+.row.vib-total { border-top: 1px solid var(--line); }
+.row.vib-total .k, .row.vib-total .v { font-weight: 600; }
+.vib-verdict {
+  margin-top: 10px; padding: 9px 12px; border-radius: 3px;
+  border-left: 2px solid var(--ok); background: rgba(87,171,90,.08);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.vib-verdict.warn { border-left-color: var(--warn); background: rgba(217,164,65,.09); }
+.vib-verdict.bad  { border-left-color: var(--act); background: rgba(242,113,107,.09); }
+.vv-label { font-size: 12.5px; color: var(--fg); font-weight: 600; }
+.vib-verdict.warn .vv-label { color: var(--warn); }
+.vib-verdict.bad .vv-label { color: var(--act); }
+.vv-also { font-size: 11px; color: var(--fg-dim); }
+.vib-split { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.vb { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.vb-k { color: var(--fg-dim); flex: 1; }
+.vb-v {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  color: var(--vib); font-variant-numeric: tabular-nums; width: 4ch; text-align: right;
+}
+.vb .bar { flex: none; width: 66px; height: 4px; background: var(--bg-sunk); border-radius: 2px; }
+.vb .bar i { display: block; height: 100%; background: var(--vib); border-radius: 2px; }
+.ctl-road .seg-btn { min-width: 26px; padding-left: 7px; padding-right: 7px; }

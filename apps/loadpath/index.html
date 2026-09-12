@@ -10,7 +10,7 @@
 <body>
   <header id="toolbar">
     <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
-    <span class="milestone">M4 · playback</span>
+    <span class="milestone">M5 · vibration</span>
     <div class="spacer"></div>
     <span id="readout" class="readout"></span>
     <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
@@ -59,12 +59,33 @@
         <em>body vs cabin</em>. It closes to nothing whenever the inputs hold
         still, so every settled number is the same with the lag on or off.
       </p>
+      <section id="vib-block">
+        <h2 class="fig-title">Vibration <span>a different quantity, in different units</span></h2>
+        <div id="spectrum"></div>
+        <p class="caption">
+          Everything above is force in newtons at one instant. This is
+          <strong>whole-body vibration</strong>: a weighted RMS acceleration in
+          m/s² spread over frequency, evaluated per ISO 2631-1. The two are
+          deliberately not combined — a comfort index averaged into a force
+          arrow would satisfy neither. They share the speed and the road, and
+          nothing else. The <em>weighted</em> trace is what the seated body is
+          sensitive to; the gap between it and the raw trace is the human
+          weighting doing its work, discarding energy the seat really does
+          deliver but the body barely registers.
+        </p>
+      </section>
     </section>
 
     <aside id="panel">
       <section>
         <h2>State</h2>
         <div id="state-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Ride <span class="count">ISO 2631-1</span></h2>
+        <div id="vib-rows" class="rows"></div>
+        <div id="vib-bands"></div>
       </section>
 
       <section>
@@ -103,9 +124,11 @@
   <script src="js/model/occupant.js"></script>
   <script src="js/model/contacts.js"></script>
   <script src="js/model/scenarios.js"></script>
+  <script src="js/model/vibration.js"></script>
   <script src="js/view2d/vectors.js"></script>
   <script src="js/view2d/side.js"></script>
   <script src="js/view2d/plan.js"></script>
+  <script src="js/view2d/spectrum.js"></script>
   <script src="js/ui/assumptions.js"></script>
   <script src="js/ui/controls.js"></script>
   <script src="js/ui/transport.js"></script>

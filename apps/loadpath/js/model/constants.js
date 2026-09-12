@@ -63,6 +63,54 @@
     m95: { label: '95th percentile male',   mass: 101 }
   };
 
+  /* ---- M5: the vibration channel ----
+     Separate constants from the force model on purpose. Nothing here has units
+     of newtons and nothing here feeds the contact solver. */
+
+  /* ISO 8608 road roughness classes. Gd(n0) in m^3, stepping by a factor of 4.
+     Paved roads in service are essentially always A through D. */
+  var ROAD = {
+    referenceSpatialFrequency: 0.1,      // n0, cycles per metre
+    wavinessExponent: 2,                 // w
+    CLASSES: {
+      A: { label: 'New motorway',      roughness: 1e-6 },
+      B: { label: 'Good asphalt',      roughness: 4e-6 },
+      C: { label: 'Worn asphalt',      roughness: 16e-6 },
+      D: { label: 'Poor surface',      roughness: 64e-6 },
+      E: { label: 'Broken / unpaved',  roughness: 256e-6 }
+    }
+  };
+
+  /* ISO 2631-1 evaluation parameters. The axis assignment of Wk and Wd lives
+     in vibration.js where the filters are; what lives here is the part of
+     EQ 7 that is arithmetic rather than filtering. */
+  var ISO2631 = {
+    kVertical: 1.0,        // multiplying factor on the z axis
+    kHorizontal: 1.4,      // multiplying factor on the x and y axes
+    bandLowHz: 0.4,
+    bandHighHz: 80,
+    comfortThreshold: 0.315   // m/s^2, the top of "not uncomfortable"
+  };
+
+  /* The ride path from road to occupant. This is the weak link in the chain. */
+  var RIDE = {
+    /* Quarter car, per corner. Textbook mid-size-sedan values, chosen for the
+       two modes they produce rather than picked as frequencies directly:
+         body on suspension   (1/2pi)*sqrt(ks/ms)        ~= 1.26 Hz
+         wheel hop            (1/2pi)*sqrt((ks+kt)/mu)   ~= 11.9 Hz */
+    sprungMass: 350,             // kg per corner
+    unsprungMass: 40,            // kg per corner
+    suspensionStiffness: 22000,  // N/m
+    suspensionDamping: 1500,     // N.s/m
+    tyreStiffness: 200000,       // N/m
+
+    /* Occupant on the seat cushion, in series with the quarter car. */
+    seatModeHz: 4.5,             // vertical
+    seatModeZeta: 0.38,
+    seatModeHorizontalHz: 2.0,   // fore-aft and lateral
+    horizontalRoadRatio: 0.35    // horizontal seat input as a fraction of vertical
+  };
+
   var PROVENANCE = {
     G: {
       value: G, unit: 'm/s^2', status: 'verified',
@@ -184,6 +232,103 @@
               'gravity tilts with the cabin — but the tyre numbers on a held ' +
               'hill start understate what the brakes are doing.'
     },
+    'ROAD.classes': {
+      unit: 'm^3', status: 'corroborated',
+      source: 'ISO 8608 road roughness classes by the displacement PSD coefficient ' +
+              'Gd(n0) at n0 = 0.1 cycles/m, with waviness exponent w = 2. Class ' +
+              'geometric means step by a factor of four: A = 1, B = 4, C = 16, ' +
+              'D = 64, E = 256, all times 1e-6 m^3.',
+      caveat: 'Confirmed by two differently worded searches; the standard itself ' +
+              'was not reachable. One secondary table found during search gave ' +
+              'class C and D bounds that do not fit the same table\'s own ' +
+              'geometric series, so treat any single secondary source here with ' +
+              'suspicion. The class is also a wide band, not a number: a real ' +
+              'road anywhere inside class B varies by 4x in roughness.'
+    },
+    'ISO2631.weightingFilters': {
+      status: 'corroborated',
+      source: 'ISO 2631-1 Wk and Wd as a cascade of a 2nd-order high-pass at ' +
+              '0.4 Hz, a 2nd-order low-pass at 100 Hz, an acceleration-velocity ' +
+              'transition, and for Wk an upward step. Wk: f3 = f4 = 12.5 Hz, ' +
+              'Q4 = 0.63, f5 = 2.37 Hz, f6 = 3.35 Hz, Q5 = Q6 = 0.91. ' +
+              'Wd: f3 = f4 = 2.0 Hz, Q4 = 0.63, no step.',
+      caveat: 'Taken from one third-party implementation of the standard, not ' +
+              'from the standard. The published one-third-octave weighting table ' +
+              'that would settle it was behind an egress block, so the curves ' +
+              'here are NOT validated against ISO\'s own numbers — only against ' +
+              'their structure (peak of 1.0 in the right band, the 2x step, the ' +
+              '-6 dB/octave knee, and Wk/Wd not being swapped). An earlier ' +
+              'recalled value for the Wk step, 2.5 and 0.25 Hz, was wrong; that ' +
+              'is why nothing here is from memory.'
+    },
+    'ISO2631.normalisation': {
+      status: 'design',
+      source: 'Each weighting curve is scaled so its peak magnitude is exactly 1.0.',
+      caveat: 'A convention, chosen because it is a real property of the published ' +
+              'curves and removes any dependence on the standard\'s internal gain ' +
+              'constants, which were not reachable. If the standard normalises ' +
+              'differently, every weighted RMS on screen is off by one constant ' +
+              'factor — the SHAPE of the spectrum would still be right.'
+    },
+    'ISO2631.comfortBands': {
+      unit: 'm/s^2', status: 'verified',
+      source: 'ISO 2631-1 comfort reactions to vibration environments: below ' +
+              '0.315 not uncomfortable; 0.315 to 0.63 a little uncomfortable; ' +
+              '0.5 to 1.0 fairly uncomfortable; 0.8 to 1.6 uncomfortable; 1.25 ' +
+              'to 2.5 very uncomfortable; above 2.0 extremely uncomfortable.',
+      caveat: 'The standard calls these approximate indications and the bands ' +
+              'OVERLAP by design, so a single value can sit in two at once. The ' +
+              'app reports both rather than picking one, because collapsing the ' +
+              'overlap discards the standard\'s own statement of how sure it is.'
+    },
+    'RIDE.quarterCar': {
+      status: 'placeholder',
+      source: 'Road to seat mount as a two-degree-of-freedom quarter car: sprung ' +
+              '350 kg, unsprung 40 kg, suspension 22 kN/m and 1500 N.s/m, tyre ' +
+              '200 kN/m. Produces a body mode near 1.26 Hz and wheel hop near ' +
+              '11.9 Hz, both in the usual ranges for a mid-size passenger car.',
+      caveat: 'Representative textbook values, not a measured vehicle. The first ' +
+              'version had no unsprung mass and therefore no wheel hop at all. ' +
+              'Adding it was the right fix — a missing degree of freedom, not a ' +
+              'number to tune — but it is worth recording how much it actually ' +
+              'mattered: the 8-20 Hz band carries about 14% of the weighted ' +
+              'vertical energy and the total value moved by roughly 13%. The ' +
+              'suspension isolates the body well at 12 Hz, so wheel hop shows at ' +
+              'the seat as a shoulder rather than the peak. The expectation ' +
+              'before measuring was that it would matter more than that.'
+    },
+    'RIDE.seatMode': {
+      unit: 'Hz', status: 'placeholder',
+      source: 'Occupant on the seat cushion as one base-excited mode: 4.5 Hz ' +
+              'vertical, 2.0 Hz horizontal, damping ratio 0.38.',
+      caveat: 'The 4-6 Hz seated vertical resonance band is sourced; this exact ' +
+              'frequency, the horizontal figure and the damping are not. Real ' +
+              'apparent mass also falls with vibration amplitude, which this does ' +
+              'not model, so it is least right where the road is worst.'
+    },
+    'RIDE.horizontalRoadRatio': {
+      status: 'placeholder',
+      source: 'Horizontal seat input taken as 0.35 of the vertical road input.',
+      caveat: 'A guess, and an unusually consequential one: EQ 7 multiplies both ' +
+              'horizontal axes by 1.4 against 1.0 for vertical, so this ratio has ' +
+              'leverage over the total value out of all proportion to the ' +
+              'confidence behind it. The app therefore reports the per-axis RMS ' +
+              'and the horizontal share alongside the total, so a reader can see ' +
+              'how much of the headline rests on this number.'
+    },
+    'RIDE.validation': {
+      status: 'placeholder',
+      source: 'The end-to-end vibration chain has NOT been checked against any ' +
+              'measured vehicle.',
+      caveat: 'Every stage is individually defensible and the assembly has never ' +
+              'been compared to a real measurement, because the papers that would ' +
+              'supply one were unreachable from this environment. The comfort ' +
+              'band is therefore a statement about this model, not about a car. ' +
+              'Tuning the placeholders until the output matched a remembered ' +
+              'figure was considered and rejected: it would have destroyed the ' +
+              'only useful thing about the number, which is that nothing was bent ' +
+              'to make it land anywhere in particular.'
+    },
     'MODEL.corneringModel': {
       status: 'design',
       source: 'Steady-state bicycle model with a constant understeer gradient.',
@@ -198,6 +343,9 @@
     VEHICLES: VEHICLES,
     SURFACES: SURFACES,
     OCCUPANTS: OCCUPANTS,
+    ROAD: ROAD,
+    ISO2631: ISO2631,
+    RIDE: RIDE,
     PROVENANCE: PROVENANCE
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

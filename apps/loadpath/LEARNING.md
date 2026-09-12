@@ -1531,3 +1531,262 @@ about four minutes.
 a corner of the input space no hand-dragging had reached. Any new way of driving
 a system — a script, an API, a batch mode — is worth running specifically to see
 what falls out, independent of whether anyone asked for it.
+
+---
+
+# Learning, part seven: building M5, and what a standard actually buys you
+
+M5 was the one the plan had been warning about since before any code existed. There
+was a failure-mode card written at planning time that said: load transfer is a
+time-domain balance, whole-body vibration is a frequency-domain weighted RMS, and
+merging them gives you something that satisfies neither.
+
+That card turned out to be right, but not in the way I expected. The hard part
+wasn't keeping the mathematics apart. It was deciding **how much of an answer I was
+entitled to publish.**
+
+## Step 1 — The first decision was a scoping decision, not a coding one
+
+Whole-body vibration has a chain: road → wheel → suspension → seat → body →
+weighting → RMS → comfort band. Eight stages.
+
+I could have built all eight at full fidelity. A proper multi-body ride model, a
+detailed seat-cushion model, measured tyre data. Weeks of work, and — this is the
+part that matters — **every additional stage is another place to be wrong, and
+the wrongness compounds silently.** Eight stages each 20% off don't give you a
+20% error. They give you a number with no relationship to reality wearing an ISO
+label.
+
+So the scoping question was: which stages are actually *standardised*, and which
+are me guessing?
+
+- ISO 8608 road PSD: standardised.
+- Frequency transform, double differentiation, RMS integration: exact mathematics.
+- ISO 2631-1 weighting and comfort bands: standardised.
+- Everything between the tyre and the body: **me guessing.**
+
+That split told me where to spend effort. I built the standardised parts
+carefully and the guessed part *deliberately small* — one quarter car, one seat
+mode. Not because a bigger model would be harder, but because a bigger guess is
+a worse guess dressed as a better one.
+
+Think of it like a chain of translators. If six of them are professionals and
+two are using a phrasebook, you don't fix the translation by hiring four more
+phrasebook users.
+
+## Step 2 — I checked the numbers I "knew," and one of them was wrong
+
+I could have written the ISO 2631-1 filter coefficients from memory. I was fairly
+confident: high-pass at 0.4, low-pass at 100, transition at 12.5 for Wk, and an
+upward step at 2.5 and 0.25 Hz.
+
+I searched anyway. The actual step frequencies are **2.37 and 3.35 Hz**, both with
+Q = 0.91. My recalled 2.5 and 0.25 was wrong, and not trivially — 0.25 Hz is
+below the high-pass corner, so that version of the curve would have had the wrong
+shape across the entire low-frequency region.
+
+This is the second time in this project that a confidently-held number was wrong.
+The first was the Wk/Wd axis assignment at M0. The pattern is worth naming:
+**the numbers you are most confident about are the ones you check last, which is
+exactly backwards.** Confidence is not evidence. It is a feeling about evidence
+you can no longer inspect.
+
+What I could NOT get was ISO's own published table of weighting factors at
+one-third-octave centres — every source that had it was behind an egress block.
+So the curves are implemented from one third-party implementation and checked for
+*structure* rather than validated against the standard's numbers. That limitation
+is in the provenance record, in the test file's header comment, and in the README.
+A test suite that looks thorough is its own way of overclaiming.
+
+## Step 3 — The self-check when you cannot check against the source
+
+No table to compare against. So what can you assert?
+
+**Structure.** The ISO curves have properties that follow from what they're for:
+
+- Each peaks at exactly 1.0 (so I normalise to that, which also removes my
+  dependence on the standard's internal gain constants — a problem turned into a
+  convention).
+- Wk peaks in the 4–12.5 Hz plateau, because that's where a seated body is most
+  sensitive.
+- Wd peaks below 2 Hz and falls at −6 dB/octave above.
+- Wk carries a 2× upward step; Wd carries none.
+
+And then the one that matters most, given this project's history:
+
+```js
+test('THE SWAP TEST: Wk and Wd cannot be exchanged without this going red', () => {
+  assert.ok(V.Wk(8) / V.Wd(8) > 3, 'Wk must dominate at 8 Hz');
+  assert.ok(V.Wd(0.8) / V.Wk(0.8) > 1.8, 'Wd must dominate below 1 Hz');
+});
+```
+
+That test exists because **this project already made that exact mistake once.** A
+test aimed at a specific documented failure is worth ten generic ones. I verified
+it by actually swapping the two functions: six tests went red.
+
+The general lesson: when you can't validate against ground truth, validate
+against *structure* — and be loud about which one you did.
+
+## Step 4 — The mess, part one: I deleted my own work with a git command
+
+Mid-milestone I ran a negative control by deliberately breaking a constant, then
+cleaned up with:
+
+```bash
+git checkout -- apps/loadpath/js/model/constants.js
+```
+
+That restored the file to **HEAD** — which predated every M5 constant I'd written
+that session. About 150 lines of constants and provenance records, gone in one
+command that I typed without thinking, because it's the command I always use.
+
+`git checkout --` doesn't undo your last edit. It undoes *everything since the
+last commit.* I knew that. I still did it, because I was thinking of it as "undo
+the thing I just did" rather than as what it actually is.
+
+Two takeaways, and the second is the useful one:
+
+1. Never use `git checkout --` as an undo for a deliberate experiment. Copy the
+   file to a scratch path first, or make the experiment in a scratch copy.
+2. **Commit before you run destructive experiments**, not after. The cost of an
+   extra commit is nothing. The cost of not having one is however long it takes
+   to rebuild what you lost — in this case, twenty minutes and a lot of care to
+   get the provenance text back verbatim.
+
+## Step 5 — The mess, part two: two tests that tested nothing
+
+Here's the more interesting failure.
+
+The first version of the ride model had no unsprung mass, so no wheel hop. I
+noticed, fixed it with a proper quarter car, and wrote two tests to guard the fix.
+All 29 tests passed.
+
+Then I ran the negative control — gutted the unsprung mass to see the tests go
+red. **They didn't. 29 of 29 still passed.**
+
+Both guards were duds:
+
+- One asserted the wheel-hop band carries more than 5% of the energy. The gutted
+  model still shows 5.9%, because that band contains *some* energy regardless of
+  whether there's a resonance in it.
+- The other compared the response slope through 10–13 Hz against 16–22 Hz,
+  expecting the resonance to make the first shallower. But slopes steepen with
+  frequency in any low-pass system, resonance or not. The comparison passed both
+  ways.
+
+I fixed them by *measuring the separation first*:
+
+```
+                      hop band share   log-log slope 16-22 Hz
+   mu = 40 kg              14.2%              -7.60
+   mu -> 0                  5.9%              -2.81
+```
+
+Then setting thresholds between those two columns instead of guessing. Now
+gutting the mass fails two tests.
+
+**A test you have never seen fail is a hypothesis, not a test.** The only way to
+know a guard works is to break the thing it guards. This takes about ninety
+seconds and it is the single highest-return habit in this whole project.
+
+## Step 6 — The temptation I turned down, and why
+
+When the chain was finished, class B asphalt at 100 km/h gave a_v ≈ 0.17 m/s².
+Literature suggests real cars read more like 0.3–0.5.
+
+I could have nudged the placeholders until it landed there. Nobody would ever
+know, the output would look more credible, and I'd already done something
+*similar* at M2 (tuning contact stiffnesses to a published pressure
+distribution).
+
+I didn't, and the difference between the two cases is the whole point:
+
+- **At M2 I tuned to a sourced target** and recorded that I had. The tuning was
+  itself a piece of information: "these stiffnesses reproduce this published
+  finding."
+- **At M5 I had no sourced target.** The measurement papers were egress-blocked.
+  I had a half-remembered range. Tuning to a remembered number produces a model
+  that agrees with my memory — which is not evidence of anything, and which
+  destroys the one useful property the untuned number has: that *nothing was bent
+  to make it land anywhere.*
+
+So the number stays low and the drawer says the chain has never been validated
+end to end. An honest 0.17 that says "unvalidated" beats a flattering 0.35 that
+implies otherwise.
+
+What I did instead was fix a *structural* omission — the missing unsprung mass.
+That's legitimate because it corrects the model, not the output. It moved the
+answer 13%, which is not enough to close the gap, and I wrote that down too,
+including the fact that I'd expected it to matter more.
+
+## Step 7 — The chart, and three things that were wrong on sight
+
+Tests don't catch layout. I rendered it and looked, and found three problems the
+green suite had nothing to say about:
+
+**The normalisation was backwards.** Both traces were scaled to their shared
+maximum. The unweighted peak is about 4× the weighted one, so the trace that
+matters got squashed into the bottom third — the chart was mostly showing the
+curve it was meant to contrast *against*. Fixed by normalising to the weighted
+peak and letting the unweighted run off the top.
+
+**Clipping drew a fake plateau.** My first fix clamped the y coordinate to the
+frame top, which made the over-range part of the trace draw as a flat line along
+the ceiling. That *reads as data.* It looks like the spectrum flattens out up
+there, and it doesn't. Replaced with a real SVG `clipPath` so the trace genuinely
+disappears. **Anything on a chart that looks like a measurement has to be one.**
+
+**The band labels sat exactly where the curves peak.** They were inside the plot
+at the top; the two lobes and the dashed trace ran straight through the words.
+Moved above the frame entirely, where nothing can ever collide with them.
+
+And a fourth, in the panel: I'd computed "horizontal share" as an *amplitude*
+ratio, which read 64%. But orthogonal components don't decompose that way —
+amplitude ratios of perpendicular axes don't sum to one. The energy share is 41%,
+which is the number a reader will assume they're being shown.
+
+## Step 8 — What an expert notices
+
+- **Which stages are standardised.** A novice builds all eight stages to the same
+  fidelity. An expert notices that four of them are exact, two are citable, and
+  two are guesses, and puts the effort — and the caveats — accordingly.
+
+- **That "it passed" is not "it works."** Every test in this milestone passed on
+  first run. Two of them tested nothing. The gap between those two facts is where
+  the work is.
+
+- **Overlapping bands are information.** ISO's comfort scale lists 0.5–1.0 and
+  0.8–1.6 as separate bands, so 0.9 is in both. That's the standard telling you
+  how precise it is. Collapsing it to one crisp label is discarding data to look
+  more confident.
+
+- **Reserved colours stay reserved.** `--act` red and `--react` blue mean
+  direction of action on a force. Vibration has no direction and is not a force,
+  so it gets a third hue. Reusing one of the two would have silently claimed the
+  quantities were the same kind of thing.
+
+## Step 9 — What transfers
+
+**Match your model's complexity to your weakest input, not your strongest.** A
+chain is only as good as its worst link, and adding detail downstream of a guess
+makes the guess harder to see, not smaller.
+
+**Check the numbers you're sure about.** Twice now, in this project, a
+confidently-recalled constant was wrong. Confidence is a feeling about evidence
+you can no longer inspect. The check costs a minute.
+
+**Break every guard at least once.** A test that has never failed is an
+untested test. Gut the thing it protects and watch it go red, or you don't know
+what you have.
+
+**Commit before destructive experiments.** `git checkout --` is not an undo
+button; it's a "discard everything since the last commit" button. The habit that
+saves you is committing more often, not typing more carefully.
+
+**Don't tune to a number you can't cite.** Tuning to a *sourced* target is
+calibration and you record it. Tuning to a remembered one is fabrication with
+extra steps, and it destroys the only thing an untuned output is good for.
+
+**Render it and look at it.** Four real defects in this milestone were invisible
+to a green test suite and obvious within two seconds of opening the page.

@@ -57,6 +57,7 @@
   var state = {};
   SPECS.forEach(function (s) { state[s.id] = s.value; });
   state.surface = 'dry';
+  state.roadClass = 'B';
 
   var onChange = null;
   var onUser = null;
@@ -73,6 +74,10 @@
       gradePercent: state.gradePercent,
       surface: state.surface,
       mu: C.SURFACES[state.surface].mu,
+      /* A vibration input and nothing else. It reaches the vibration solver and
+         never the force solver; a unit test asserts that changing it does not
+         move a single newton. */
+      roadClass: state.roadClass,
       /* Pedal demand in g, resolved into one longitudinal acceleration.
          Both at once is a real thing a nervous driver does and the model
          should not pretend otherwise, so they simply sum. */
@@ -143,6 +148,39 @@
     wrap.appendChild(group);
     parent.appendChild(wrap);
     nodes.surface = group;
+  }
+
+  /* Road roughness, an ISO 8608 class. It sits next to Surface because both are
+     properties of the road, but they feed different halves of the app: mu goes
+     to the friction ellipse, roughness goes to the vibration channel. */
+  function buildRoad(parent) {
+    var wrap = dom('div', 'ctl ctl-surface ctl-road');
+    wrap.appendChild(dom('span', 'ctl-label', 'Roughness'));
+    var group = dom('div', 'seg');
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-label', 'Road roughness class');
+    Object.keys(C.ROAD.CLASSES).forEach(function (key) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'seg-btn' + (key === state.roadClass ? ' on' : '');
+      b.textContent = key;
+      b.title = 'ISO 8608 class ' + key + ' — ' + C.ROAD.CLASSES[key].label;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', key === state.roadClass ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        if (onUser) onUser('roadClass');
+        state.roadClass = key;
+        [].forEach.call(group.children, function (c) {
+          c.classList.remove('on'); c.setAttribute('aria-checked', 'false');
+        });
+        b.classList.add('on'); b.setAttribute('aria-checked', 'true');
+        emit();
+      });
+      group.appendChild(b);
+    });
+    wrap.appendChild(group);
+    parent.appendChild(wrap);
+    nodes.road = group;
   }
 
   /* The friction ellipse, live. Both axis maxima are mu*g, so the admissible
@@ -243,6 +281,7 @@
     var strip = dom('div', 'ctl-strip');
     SPECS.forEach(function (s) { buildSlider(s, strip); });
     buildSurface(strip);
+    buildRoad(strip);
     buildGauge(strip);
 
     var btn = document.createElement('button');

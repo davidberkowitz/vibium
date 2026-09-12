@@ -3,8 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M4 built and green.** Two views, five live inputs, four scripted maneuvers, and the
-solver running behind them, with 162 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M5 built and green.** Two views, five live inputs, four scripted maneuvers, a
+separate vibration channel, and the solver running behind them, with 191 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -105,6 +105,69 @@ a standstill. The converse is not modelled and is recorded as `MODEL.stoppedCar`
 held on a grade is spending longitudinal friction to stay put, and the traction gauge shows that
 as zero.
 
+## Vibration, which is a different kind of number entirely
+
+![The weighted spectrum at the seat](images/13-m5-spectrum.png)
+
+Everything else in this app is force in newtons at one instant. Whole-body vibration is a
+frequency-weighted RMS acceleration over a band — different mathematics, different units, and the
+plan flagged before either half existed that merging them produces something satisfying neither.
+
+So M5 is a **separate channel**. It takes the speed and the road roughness and nothing else. It
+returns m/s² and a comfort band, never a newton, and never touches the contact split. That
+separation is enforced by a test rather than by good intentions: **stepping the road class from A
+to E must move no contact force by a single newton.** It gets its own hue too, because `--act` and
+`--react` encode direction of action on a force, and vibration has no direction and is not a force.
+
+The chain, and how much of each link is actually standardised:
+
+| Stage | |
+|---|---|
+| ISO 8608 road class → displacement PSD | standard |
+| speed → spatial to temporal frequency | exact |
+| quarter car → body mode and wheel hop | **placeholder** |
+| seat → occupant on the cushion | **placeholder** |
+| ISO 2631-1 Wk / Wd weighting | corroborated |
+| integrate → band-limited weighted RMS | exact |
+| ISO 2631-1 comfort reaction band | verified |
+
+The chart is there because the single comfort number hides the thing that makes vibration
+different. Two lobes are legible on sight — the body on its suspension near 1.3 Hz and you on the
+seat cushion near 4.5 Hz — with a wheel-hop shoulder near 12 Hz. The dashed trace is the same
+quantity before weighting; where it runs off the top of the frame is exactly where the human
+weighting is discarding the most.
+
+### What the model got wrong, and how
+
+The first version had **no unsprung mass**, so no wheel hop at all. Wheel hop lands inside Wk's
+full-strength 4–12.5 Hz plateau, so that looked like a serious omission. Adding the missing degree
+of freedom was the right fix — structure, not tuning — but the honest footnote is that it mattered
+less than expected: the 8–20 Hz band carries about 14% of the weighted vertical energy and the
+total moved by roughly 13%. The suspension isolates the body well at 12 Hz.
+
+Two tests written to guard that fix were then found to be **non-diagnostic** — deleting the
+unsprung mass left both green. They were rewritten against the measured separation between the
+real model and a gutted one rather than against guessed thresholds, and the numbers are in the
+test file so the next person can see where they came from.
+
+### The number wears an ISO label it has not fully earned
+
+Four of eight stages are exact or standardised. Two are representative textbook values. One is a
+guessed horizontal-to-vertical input ratio that equation 7 then multiplies by 1.4. And **the
+assembled chain has never been compared against a measured car** — the papers that would supply
+one were unreachable from this environment.
+
+Tuning the placeholders until the output matched a remembered figure was considered and rejected.
+It would have destroyed the only useful property the number has: that nothing was bent to make it
+land anywhere in particular. Instead the drawer says the chain is unvalidated end to end, the
+panel reports per-axis RMS and the horizontal share so you can see how much of the headline rests
+on the guess, and the spectrum is shown so the **shape** — which is the trustworthy part — is what
+the eye reads first.
+
+One more thing worth knowing: ISO's comfort bands **overlap by design**. 0.5–1.0 and 0.8–1.6 are
+both listed, so 0.9 m/s² is legitimately in two at once. The app reports both, because collapsing
+the overlap into one crisp label throws away the standard's own statement of how sure it is.
+
 ## Asking for more than the tyres have
 
 ![Over the friction limit](images/11-m3-over-limit.png)
@@ -178,8 +241,8 @@ goes — they are absorbing kinematics the model does not have.
 | **M2** | Contact solver and provenance drawer | **done** — 57 tests |
 | **M3** | Plan view and live sliders | **done** — 10 tests |
 | **M4** | Scripted playback and body lag | **done** — 26 tests |
-| M5 | Vibration overlay | next |
-| M6 | 3D toggle | gated, may be cut |
+| **M5** | Vibration overlay | **done** — 29 tests |
+| M6 | 3D toggle | next — gated, may be cut |
 
 M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
 right number rendered plainly, because the polish buys it credibility it hasn't earned.
@@ -188,7 +251,7 @@ right number rendered plainly, because the polish buys it credibility it hasn't 
 
 ```bash
 make loadpath           # serve the app on http://localhost:8081
-make test-loadpath      # 162 unit tests
+make test-loadpath      # 191 unit tests
 make loadpath-report    # the headless model report, no browser needed
 ```
 
@@ -255,7 +318,8 @@ apps/loadpath/
 │   ├── vehicle.js       EQ 1-4: cornering, load transfer, friction ellipse
 │   ├── occupant.js      EQ 5-6: segment masses, required force, third-law audit
 │   ├── contacts.js      the indeterminate split, box-constrained QP
-│   └── scenarios.js     maneuvers as input timelines, and the body lag
+│   ├── scenarios.js     maneuvers as input timelines, and the body lag
+│   └── vibration.js     the separate frequency-domain channel
 ├── js/view2d/           side elevation, plan view, shared SVG helpers
 ├── js/ui/               controls, transport bar, assumptions drawer
 ├── js/app.js            the one solve, and the one frame loop

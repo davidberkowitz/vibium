@@ -1,4 +1,5 @@
-/* Driver Load Path — M4. Two views, five live inputs, four scripted maneuvers.
+/* Driver Load Path — M5. Two views, live inputs, scripted maneuvers, and a
+   separate vibration channel.
 
    Up to now the app showed one frozen state. This is where it becomes a
    simulation: you set what a driver does, and every number and every arrow on
@@ -27,6 +28,14 @@
    the body's acceleration is a first-order lagged copy of the cabin's, so the
    figure arrives late the way a real occupant does. The tyres are not lagged;
    they are bolted to the car.
+
+   M5 adds a channel that is deliberately NOT part of any of that. Whole-body
+   vibration is a weighted RMS over a frequency band, not a balance at an
+   instant, so it takes the speed and the road roughness and nothing else, and
+   returns m/s^2 that never touch a force arrow. The plan called that separation
+   out as a failure mode before either half existed; the test that enforces it
+   asserts that changing the road class moves no contact force by a single
+   newton.
 */
 (function (global) {
   'use strict';
@@ -42,6 +51,8 @@
   var Assumptions = global.LoadPathAssumptions;
   var S = global.LoadPathScenarios;
   var Transport = global.LoadPathTransport;
+  var Vib = global.LoadPathVibration;
+  var Spectrum = global.LoadPathSpectrum;
 
   var CAR = C.VEHICLES.sedan;
   var DRIVER = C.OCCUPANTS.m50;
@@ -91,7 +102,15 @@
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
     var split = K.solve(occupant.carOnBody);
-    return { inputs: inputs, vehicle: vehicle, occupant: occupant, split: split };
+
+    /* The vibration channel. It takes the SPEED and the ROAD CLASS and nothing
+       else — not the acceleration, not the lagged body state, and certainly not
+       the contact split. It is computed here only so there is one solve per
+       frame; its result never re-enters the chain above it. */
+    var vibration = Vib.solve({ speed: inputs.speed, roadClass: inputs.roadClass });
+
+    return { inputs: inputs, vehicle: vehicle, occupant: occupant,
+             split: split, vibration: vibration };
   }
 
   /* ---------------- panel ---------------- */
@@ -138,6 +157,63 @@
       banner.textContent = 'These inputs ask for ' + (v.utilisation * 100).toFixed(0) +
         '% of the available grip. The car cannot do it, so both drawings show the ' +
         'clamped state the tyres can actually deliver — not what you asked for.';
+    }
+  }
+
+  /* The ride panel. Units are m/s^2 throughout and it is kept visually apart
+     from the force rows, because the single most likely misreading of this
+     screen is treating a comfort number as another force. */
+  function renderVibration() {
+    var box = document.getElementById('vib-rows');
+    var v = cur.vibration;
+    box.innerHTML = '';
+    var rows = [
+      ['Vertical, a_wz', v.awz.toFixed(3) + ' m/s²', 'Wk weighted'],
+      ['Horizontal each, a_w', v.awx.toFixed(3) + ' m/s²', 'Wd weighted'],
+      ['Total value, a_v', v.av.toFixed(3) + ' m/s²', 'equation 7'],
+      ['Horizontal share', (v.horizontalShare * 100).toFixed(0) + ' %',
+       'of a_v\u00b2, on a guessed ratio'],
+      ['Road', 'class ' + v.roadClass, v.roadLabel.toLowerCase()]
+    ];
+    rows.forEach(function (x) {
+      var row = el('div', 'row vib-row' + (x[0].indexOf('Total') === 0 ? ' vib-total' : ''));
+      row.appendChild(el('span', 'k', x[0]));
+      row.appendChild(el('span', 'v', x[1]));
+      row.appendChild(el('span', 'note', x[2]));
+      box.appendChild(row);
+    });
+
+    var bands = document.getElementById('vib-bands');
+    bands.innerHTML = '';
+    var c = v.comfort;
+    var verdict = el('div', 'vib-verdict ' + c.level);
+    verdict.appendChild(el('span', 'vv-label', c.label));
+    if (c.overlapping) {
+      /* ISO's own bands overlap, so a value can sit in two at once. Saying both
+         is not hedging — it is reporting the standard's stated precision. */
+      verdict.appendChild(el('span', 'vv-also', 'also: ' + c.also));
+    }
+    bands.appendChild(verdict);
+
+    if (v.av > 0) {
+      var split = el('div', 'vib-split');
+      v.bands.forEach(function (b) {
+        var r = el('div', 'vb');
+        r.appendChild(el('span', 'vb-k', b.label));
+        r.appendChild(el('span', 'vb-v', (b.share * 100).toFixed(0) + '%'));
+        var bar = el('span', 'bar'); var i = el('i');
+        i.style.width = (b.share * 100).toFixed(1) + '%';
+        bar.appendChild(i); r.appendChild(bar);
+        split.appendChild(r);
+      });
+      bands.appendChild(split);
+      bands.appendChild(el('p', 'muted',
+        'Share of the weighted vertical energy. Where it sits is why the number ' +
+        'is what it is.'));
+    } else {
+      bands.appendChild(el('p', 'muted',
+        'Stationary: no road passes under the tyres, so there is no road input ' +
+        'at all. Idle and driveline vibration are not modelled.'));
     }
   }
 
@@ -272,7 +348,10 @@
     planView = Plan.render(document.getElementById('figure-plan'), cur.vehicle,
                            cur.occupant, cur.split, function (id) { select(id); });
 
+    Spectrum.render(document.getElementById('spectrum'), cur.vibration);
+
     renderState();
+    renderVibration();
     renderContacts();
     renderSegments();
     if (controls) controls.updateGauge(cur.vehicle, inputs.mu);
