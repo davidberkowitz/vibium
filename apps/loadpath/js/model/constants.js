@@ -162,6 +162,28 @@
               'to a known answer rather than measured — they are absorbing the ' +
               'kinematics the point-mass model throws away.'
     },
+    'MODEL.bodyLag': {
+      value: 0.25, unit: 's', status: 'placeholder',
+      source: 'First-order time constant for the occupant\'s acceleration ' +
+              'following the cabin\'s. Stands for the whole compliant chain — ' +
+              'suspension travel, seat foam, soft tissue and postural response.',
+      caveat: 'Not measured, and structurally wrong in one specific way: a ' +
+              'first-order lag can never overshoot, while a real torso on a ' +
+              'compliant seat is second-order and does. You get the delay and ' +
+              'none of the rebound, so a hard stop looks calmer than it feels. ' +
+              'It changes only the TRANSIENT; every settled state is identical ' +
+              'with the lag on or off.'
+    },
+    'MODEL.stoppedCar': {
+      status: 'design',
+      source: 'Brake demand is suppressed at zero speed, because a car already ' +
+              'stopped cannot decelerate further.',
+      caveat: 'The converse is not modelled: a car held on a grade really is ' +
+              'spending longitudinal friction to stay put, and this model shows ' +
+              'that as zero traction used. The occupant side is still right — ' +
+              'gravity tilts with the cabin — but the tyre numbers on a held ' +
+              'hill start understate what the brakes are doing.'
+    },
     'MODEL.corneringModel': {
       status: 'design',
       source: 'Steady-state bicycle model with a constant understeer gradient.',

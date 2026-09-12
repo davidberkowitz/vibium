@@ -3,8 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M3 built and green.** Two views, five live inputs, and the solver running behind them,
-with 136 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M4 built and green.** Two views, five live inputs, four scripted maneuvers, and the
+solver running behind them, with 162 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -57,6 +57,53 @@ somewhere else.
 Everything downstream comes from one solve. The panel does not re-derive the g-load and the gauge
 does not re-derive the friction utilisation. Two places computing the same number is two places to
 disagree.
+
+## Time, and the body arriving late
+
+![Mid-maneuver, the body still catching up](images/12-m4-playing.png)
+
+M4 gives the model a clock. Four maneuvers — steady cruise, a motorway lane change, a threshold
+stop, a hill start on a 12% grade — are timelines of the same five driver inputs, so playback is
+not a second code path. It is the existing chain with its inputs coming from a clock instead of a
+thumb. Play, pause, scrub. Touch a slider and playback stops, because a running scenario is
+writing to those sliders every frame and a user fighting the clock will lose.
+
+The addition is one insertion between vehicle and occupant: the body's acceleration is a
+**first-order lagged copy** of the cabin's, so the figure arrives late the way an occupant does.
+Mid-maneuver the two drawings deliberately disagree — the tyre loads in plan have already moved
+while the body in elevation is still coming — and the gap between them is printed as *body vs
+cabin*. The tyres are not lagged; they are bolted to the car.
+
+Three things keep that honest rather than decorative:
+
+- **It is a transient and nothing else.** A settled state is identical with the lag on or off, to
+  within 1e-6 N on every contact. That is a unit test, not a claim. The loop pins itself exactly
+  on target when it settles and then stops requesting frames — 61 fps while something is moving,
+  **zero when nothing is**.
+- **It cannot overshoot, and a real torso does.** A first-order lag approaches monotonically. A
+  body on a compliant seat is second-order and rocks past where it ends up. This model gives the
+  delay and none of the rebound, which makes a hard stop look calmer than it feels. Recorded as
+  `MODEL.bodyLag`, status placeholder, τ = 0.25 s.
+- **Newton survives it.** The lagged body is accelerating differently from the cabin, which is the
+  point; what must not change is that the force it puts into the car is the exact negative of the
+  force the car puts into it. Asserted every step through a transient.
+
+### Speed and the pedals have to agree
+
+Speed and pedal demand are independent inputs here — nothing integrates one into the other — so a
+hand-authored timeline could ask for 0.8 g of braking at a constant 100 km/h and the solver would
+draw it without complaint. Rather than pretend to integrate, every preset is authored with the
+arithmetic done by hand and then **checked**: each stretch of the speed profile must match the
+mean acceleration the vehicle solver actually produces over that same stretch. A negative-control
+test feeds it a deliberately incoherent timeline and asserts it is caught.
+
+That check also forced a real correction to the model. A car held on the brake at a standstill was
+being drawn throwing its occupant forward at 0.3 g, because `ax` is pedal *demand* and nothing
+knew the car had no speed left to give. **A stopped car cannot decelerate**, so brake demand is
+now suppressed at zero speed. Throttle from rest passes through, because that is how a car leaves
+a standstill. The converse is not modelled and is recorded as `MODEL.stoppedCar`: a car really
+held on a grade is spending longitudinal friction to stay put, and the traction gauge shows that
+as zero.
 
 ## Asking for more than the tyres have
 
@@ -130,8 +177,8 @@ goes — they are absorbing kinematics the model does not have.
 | **M1** | Side elevation, cruise baseline | **done** — 12 tests |
 | **M2** | Contact solver and provenance drawer | **done** — 57 tests |
 | **M3** | Plan view and live sliders | **done** — 10 tests |
-| M4 | Scripted playback | next |
-| M5 | Vibration overlay | |
+| **M4** | Scripted playback and body lag | **done** — 26 tests |
+| M5 | Vibration overlay | next |
 | M6 | 3D toggle | gated, may be cut |
 
 M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
@@ -141,7 +188,7 @@ right number rendered plainly, because the polish buys it credibility it hasn't 
 
 ```bash
 make loadpath           # serve the app on http://localhost:8081
-make test-loadpath      # 69 unit tests
+make test-loadpath      # 162 unit tests
 make loadpath-report    # the headless model report, no browser needed
 ```
 
@@ -154,7 +201,9 @@ here reads **1.00, not 0**. You always feel your own weight.
 
 All twelve contacts are placed on real anatomy and are selectable, by mouse or keyboard. Picking
 one shows what crosses it in **both** directions, which is the half most driving diagrams leave
-out. A contact can be deep-linked: `index.html?select=bolster`.
+out. A contact can be deep-linked: `index.html?select=bolster`. So can a state
+(`?speed=25&steerAngle=0.045&brake=0.4`) or a maneuver (`?play=threshold_stop`), which is also how
+the headless screenshot pass drives it.
 
 ![A contact selected, showing both directions of its force pair](images/06-m1-contact-selected.png)
 
@@ -204,11 +253,16 @@ apps/loadpath/
 ├── js/model/
 │   ├── constants.js     values plus a provenance record for each
 │   ├── vehicle.js       EQ 1-4: cornering, load transfer, friction ellipse
-│   └── occupant.js      EQ 5-6: segment masses, required force, third-law audit
-├── js/m0-report.js      headless harness; goes away when app.js arrives
+│   ├── occupant.js      EQ 5-6: segment masses, required force, third-law audit
+│   ├── contacts.js      the indeterminate split, box-constrained QP
+│   └── scenarios.js     maneuvers as input timelines, and the body lag
+├── js/view2d/           side elevation, plan view, shared SVG helpers
+├── js/ui/               controls, transport bar, assumptions drawer
+├── js/app.js            the one solve, and the one frame loop
+├── js/m0-report.js      headless harness, kept past M1
 └── images/              four generated illustrations
 
-tests/loadpath/model.test.js    at the repo root, matching gridprobe and mindmap
+tests/loadpath/*.test.js        at the repo root, matching gridprobe and mindmap
 ```
 
 ## Attribution

@@ -140,6 +140,17 @@
     var ax = inputs.ax || 0;
     var mu = inputs.mu;
 
+    /* A stopped car cannot decelerate. ax here is pedal DEMAND, and a driver
+       holding the brake at a standstill — at a light, or on a hill start — is
+       demanding a deceleration the car has no speed left to give. Without this
+       the model draws a stationary occupant being thrown forward at 0.3 g.
+
+       Only braking is suppressed. Throttle from rest is exactly how a car
+       leaves a standstill, so it passes through. Note also what this does NOT
+       claim: the longitudinal friction a real car spends holding itself on a
+       slope is not modelled. See MODEL.stoppedCar. */
+    if ((inputs.speed || 0) <= 0 && ax < 0) ax = 0;
+
     var utilisation = frictionUtilisation({ ax: ax, ay: ay, mu: mu });
     var clamped = clampToEllipse({ ax: ax, ay: ay, mu: mu });
 

@@ -10,13 +10,14 @@
 <body>
   <header id="toolbar">
     <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
-    <span class="milestone">M3 · live</span>
+    <span class="milestone">M4 · playback</span>
     <div class="spacer"></div>
     <span id="readout" class="readout"></span>
     <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
   </header>
 
   <div id="controls"></div>
+  <div id="transport"></div>
   <p id="limit-banner" class="limit-banner" hidden></p>
 
   <main id="stage">
@@ -49,6 +50,14 @@
         driver can only brace so hard. Ask for more grip than the surface has
         and both drawings keep showing the clamped state the tyres can actually
         deliver, and say so rather than extrapolating.
+      </p>
+      <p class="caption">
+        With <strong>body lag</strong> on, the occupant follows the cabin
+        through a first-order delay, so mid-maneuver the two drawings
+        deliberately disagree: the tyre loads in plan have already moved while
+        the body in elevation is still arriving. That gap is the readout marked
+        <em>body vs cabin</em>. It closes to nothing whenever the inputs hold
+        still, so every settled number is the same with the lag on or off.
       </p>
     </section>
 
@@ -93,11 +102,13 @@
   <script src="js/model/vehicle.js"></script>
   <script src="js/model/occupant.js"></script>
   <script src="js/model/contacts.js"></script>
+  <script src="js/model/scenarios.js"></script>
   <script src="js/view2d/vectors.js"></script>
   <script src="js/view2d/side.js"></script>
   <script src="js/view2d/plan.js"></script>
   <script src="js/ui/assumptions.js"></script>
   <script src="js/ui/controls.js"></script>
+  <script src="js/ui/transport.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

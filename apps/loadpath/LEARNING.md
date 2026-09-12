@@ -1226,3 +1226,308 @@ reality, and users will believe it anyway.
 
 *Prepared by David Berkowitz. Research and drafting with Anthropic Claude. Illustrations from
 Google Gemini Nano Banana.*
+
+---
+
+# Learning, part six: building M4, and the difference between a delay and a lie
+
+M4 looked like the easy one. Play, pause, scrub, and smooth the figure out a bit
+so it stops snapping around like a mannequin on a stick. Two afternoons of UI.
+
+It was not the easy one, and the reason is worth the whole essay: **adding time
+to a model exposes every place the model was only ever true at one instant.**
+
+## Step 1 — Approach: playback is not a mode, it is a different input source
+
+The first decision was the one that mattered, and I made it before writing a
+line. There were two ways to build playback.
+
+The tempting way: a `playScenario()` function that walks a timeline, computes
+states, and draws them. Its own loop, its own solve, its own render.
+
+The way I took: a scenario is **a timeline of the same five driver inputs the
+sliders already produce**, and playback just feeds those into the existing chain.
+
+Think of the difference like a player piano. The bad design builds a second
+piano that plays itself. The good one puts a paper roll over the keys of the
+piano you already have. Every note that comes out is a note the instrument could
+already make — you have only changed what is pressing the keys.
+
+This is not aesthetics. It means there is exactly one place in the codebase that
+turns driver inputs into forces, so a bug in the physics shows up identically
+whether you dragged a slider or pressed play, and a fix lands in both. The
+alternative gives you two subtly diverging simulations and a class of bug where
+"it only happens during playback" — the worst possible thing to debug, because
+your reproduction case is a moving target.
+
+## Step 2 — The lag, and why I nearly built it wrong twice
+
+The plan had flagged, back at the failure-modes stage, that a quasi-static solve
+redraws the body the instant the input moves. Real bodies arrive late. Fine: add
+a lag.
+
+**Wrong version one: lag the drawing.** Smooth the arrow lengths and the label
+positions with an easing function. This is what a front-end instinct reaches for
+and it is a lie dressed as polish. The numbers on screen would no longer be the
+output of any solve — they would be a weighted average of two solves, which
+corresponds to no physical state at all. Print one of those and you have
+published a force that does not exist.
+
+**Wrong version two: lag everything.** Put the filter at the top, between the
+inputs and the vehicle solver, so the whole simulation smooths. Also wrong, in a
+way that takes a second to see: the tyres are *bolted to the car*. A contact
+patch does not arrive late to its own car's acceleration. Lagging the corner
+loads would invent a compliance that does not exist.
+
+**The right version** puts the filter in exactly one place, between the vehicle
+and the occupant:
+
+```
+inputs -> vehicle (instantaneous) -> [LAG] -> occupant -> contact split
+                    |
+                    +-> tyre loads, friction gauge
+```
+
+The car's acceleration is what it is. The *body's* acceleration follows it
+through a delay, because between the road and your torso sit a spring, a bushing,
+a seat frame, four inches of foam and a lot of soft tissue. That delay is real
+physics, not a rendering trick, and putting the filter there is what makes the
+difference between a delay and a lie.
+
+The visible payoff is that mid-maneuver **the two drawings deliberately
+disagree**. The plan view's tyre loads have already transferred; the side
+elevation's body is still coming. In the hero screenshot the cabin is pulling
+0.20 g while the body is only at 0.11 g, and the panel prints the 0.09 g gap
+between them by name. A reader who notices the disagreement and thinks "that's a
+bug" has actually understood the model.
+
+## Step 3 — Exact exponential, not Euler, and why that is not pedantry
+
+The lag update could have been written two ways.
+
+```js
+cur += (target - cur) * (dt / tau);                // Euler
+cur += (target - cur) * (1 - Math.exp(-dt / tau)); // exact
+```
+
+They agree when `dt` is much smaller than `tau`, and every tutorial uses the
+first one. I used the second, and here is the scenario that decides it: someone
+switches browser tabs for thirty seconds. `requestAnimationFrame` stops firing.
+They come back, and the next frame arrives with `dt = 30`.
+
+With `tau = 0.25`, the Euler form computes a step of `30 / 0.25 = 120`. It
+multiplies the gap by **120** and flings the body a hundred times past its
+target, then overcorrects the other way, and rings itself apart. The exponential
+form computes `1 - e^(-120)`, which is 1.0, and snaps cleanly to the target —
+which is exactly what you want, because thirty seconds is plenty of time for a
+body to settle.
+
+The lesson generalises past filters: **when a formula has a regime where it is
+only approximately right, find out what happens at the edge of that regime before
+you ship it.** A discretisation that is "fine for small `dt`" is a bomb with a
+variable-length fuse, and in a browser you do not control `dt`.
+
+There is a unit test that walks `dt` from 0.001 to a million and asserts the
+coefficient stays inside `[0, 1]`. It would fail instantly on the Euler form.
+
+## Step 4 — The test that stops the lag from becoming a bias
+
+This is the single most important test in the milestone, and it took ten minutes
+to write.
+
+A lag is supposed to be a **transient**. It changes how you get somewhere; it
+must not change where you end up. If the settled state with the lag on differs
+at all from the settled state with it off, then the lag has stopped being a
+visual nicety and started quietly biasing every newton the app prints.
+
+So: run the lagged body forward 2000 steps, solve the contact split, solve it
+again with no lag at all, and assert all twelve contacts agree to within 1e-6 N.
+
+```js
+Object.keys(direct.byTouchpoint).forEach((id) => {
+  const d = Math.abs(lagged.byTouchpoint[id].magnitude -
+                     direct.byTouchpoint[id].magnitude);
+  assert.ok(d < 1e-6, `${id} differs by ${d} N once settled`);
+});
+```
+
+I also verified it in the running browser, which caught something the unit test
+structurally could not: the *app's* settled state has to match too. The frame
+loop pins the lag exactly on target when it settles rather than leaving it
+0.0001 away, and then **stops requesting frames**. Measured: 61 frames per
+second while something is moving, **zero when nothing is**. That is not
+politeness about battery life. It is what guarantees a screenshot of a settled
+M4 state is bit-identical to the M3 state it replaced.
+
+## Step 5 — The mess: two hours on an arithmetic problem I had created
+
+Here is the part where it went wrong.
+
+Speed and pedal demand are **independent inputs** in this model. Nothing
+integrates one into the other — you set a speed, and separately you set a brake
+pressure. That was fine for three milestones, because a slider is one instant and
+an instant has no history.
+
+A timeline has history. And a timeline can say: *100 km/h, constant, for six
+seconds, with the brake at 0.8 g the whole time.* The solver will draw that with
+a completely straight face. It is physically incoherent and it looks perfectly
+plausible.
+
+I decided not to fix it by integrating (that changes speed from an input into an
+output, and rewrites three milestones of UI). I decided to fix it by **checking**:
+differentiate the authored speed profile, compare it against the acceleration the
+vehicle solver actually produces, and fail the build on a mismatch.
+
+The first implementation compared at sampled instants with a centred difference.
+Two of four scenarios failed:
+
+```
+threshold_stop disagrees by 3.916 m/s^2 at t=4.00:
+  speed implies -3.929, pedals give -7.845
+hill_start disagrees by 1.373 m/s^2 at t=2.55:
+  speed implies 0.000, pedals give 1.373
+```
+
+My first instinct was to widen the tolerance. **That instinct was wrong and it is
+worth knowing why.** A tolerance wide enough to swallow those (0.4 g) is wide
+enough to swallow a genuine authoring blunder. I would have kept a test that
+passes and detects nothing — which is worse than no test, because it buys false
+confidence.
+
+The failures were at *corners* in the speed profile, and the real cause was
+structural: **speed interpolates linearly, so a speed segment asserts a constant
+acceleration over its whole span.** Comparing that against the instantaneous
+pedal value at some sampled midpoint is comparing the wrong two things. Anywhere
+a pedal is ramping, or the profile has a kink, the sampled comparison disagrees
+for reasons that have nothing to do with whether the scenario is correct.
+
+The fix was to change what gets compared, not how loosely:
+
+> For each stretch between consecutive speed keyframes, the slope the keyframes
+> claim must equal the **mean** acceleration the solver produces over that same
+> stretch.
+
+Integrates ramps correctly. Puts the corners on segment boundaries where they
+belong. Same tolerance, and now it means something. All four pass, and a negative
+control — a deliberately incoherent timeline — is caught by 7.8 m/s^2.
+
+**The transferable lesson: when a test fails, ask whether you are comparing the
+right two quantities before you ask whether the threshold is too tight.** A
+failing test is sometimes telling you your measurement is wrong, not your code.
+Loosening it destroys the evidence.
+
+## Step 6 — A model bug the scenarios forced into the open
+
+Building the hill start surfaced something three milestones of sliders had never
+reached.
+
+A car held on the brake at a standstill. Speed zero, brake 0.30 g. The model
+computed `ax = -0.30 g` and drew the stationary occupant being thrown forward at
+a third of a gravity. Sitting at a red light.
+
+The bug had been there since M0. It was unreachable because nobody drags the
+speed slider to zero *and* the brake slider up and then stares at the figure. The
+scenario did exactly that, for two full seconds, on purpose.
+
+The fix is one line and one paragraph of comment: `ax` is pedal **demand**, and a
+car with no speed left cannot supply a deceleration.
+
+```js
+if ((inputs.speed || 0) <= 0 && ax < 0) ax = 0;
+```
+
+Braking only — throttle from rest passes straight through, because that is how a
+car leaves a standstill. And I wrote down what the fix does *not* claim, because
+that is the half that gets forgotten: a real car held on a 12% slope genuinely is
+spending longitudinal friction to stay put, and this model shows the traction
+gauge at zero. Recorded as `MODEL.stoppedCar`, visible in the drawer.
+
+**The lesson: a new mode of interaction is a fuzzer.** Scripted playback visited
+input combinations no human had bothered to drag to, held them for seconds, and
+found a defect that had been sitting in the code since the first day. If you want
+to find bugs in a parameter space, stop sampling it by hand.
+
+## Step 7 — Naming the limitation you just built
+
+A first-order lag **can never overshoot**. It approaches its target
+monotonically, always, by construction.
+
+A real torso on a compliant seat is a second-order system — mass, stiffness,
+damping — and it *does* overshoot. In a hard stop you rock forward past where you
+end up and then settle back. Everyone has felt this.
+
+So the model now gives you the delay and none of the rebound, and a hard stop
+looks calmer than it feels. That is a real limitation, introduced deliberately,
+in the same commit as the feature.
+
+I did three things with it rather than one:
+
+1. Wrote it into `MODEL.bodyLag` in the provenance registry, status
+   `placeholder`, so it renders in the assumptions drawer alongside the other
+   numbers you should not quote.
+2. Wrote it into the plan's failure-mode card for the *mitigation itself* — the
+   fix for one problem is now documented as the source of another.
+3. Put it in a **unit test**, as the assertion that the monotone approach holds:
+
+```js
+assert.ok(v.x <= prev + 1e-12, 'first-order lag must not overshoot');
+```
+
+That test reads like it is protecting a nice property. It is really pinning down
+a known inaccuracy so that nobody later "fixes" the ringing back in without
+realising they have changed the model's order.
+
+**Documenting a limitation in the same commit as the feature is the only time it
+is cheap.** A week later you have stopped seeing it. A month later someone quotes
+the number in a slide.
+
+## Step 8 — What an expert notices here
+
+Four things a beginner would miss:
+
+- **Which quantity gets filtered.** Everyone reaches for a smoothing filter. Very
+  few stop to ask *what*, physically, is compliant. The answer decides whether
+  you have modelled something or faked it, and it is the difference between the
+  tyres and the torso.
+
+- **That the settled-state test is the real deliverable.** The lag is twenty
+  lines. The test proving it changes nothing at equilibrium is what lets anyone
+  trust a number printed while it is running.
+
+- **That the frame loop must stop.** An always-on `requestAnimationFrame` is the
+  default in every tutorial. A loop that shuts itself off when the scene is
+  static is both cheaper and *epistemically* better: it makes "settled" an
+  observable state of the program rather than an approximate visual impression.
+
+- **That independent inputs need a consistency invariant the moment you add
+  time.** Two free variables that ought to be related are harmless at one
+  instant. Over an interval they can contradict each other, and nothing will tell
+  you unless you write the check.
+
+## Step 9 — What transfers
+
+**Adding a time dimension audits your model for free.** Everything that was only
+true at one instant gets held for seconds and stared at. The stopped-car bug had
+survived three milestones and 136 tests; a two-second hold at zero speed killed
+it. If you have a model you are unsure about, run it *over time* before you run
+it over more cases.
+
+**Find the edge of your approximation before shipping it.** "Fine for small `dt`"
+means "there exists a `dt` that breaks it," and in a browser you do not choose
+`dt`. Ask what happens at the edge — the fix is usually one `Math.exp` away, and
+the bug it prevents is one you would have debugged at 2 a.m.
+
+**When a test fails, suspect the comparison before the threshold.** Widening a
+tolerance to make a red test green is the most common way to end up with a test
+suite that detects nothing. Twice in this milestone the right move was to change
+*what* was being compared and keep the tolerance exactly where it was.
+
+**Write the limitation into the same commit as the feature.** Not the next PR,
+not the docs sprint. You will never understand the thing's weaknesses better than
+in the hour you finished building it, and the cost of writing them down then is
+about four minutes.
+
+**New interaction modes are fuzzers.** Playback found a latent defect by visiting
+a corner of the input space no hand-dragging had reached. Any new way of driving
+a system — a script, an API, a batch mode — is worth running specifically to see
+what falls out, independent of whether anyone asked for it.

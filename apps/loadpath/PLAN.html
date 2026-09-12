@@ -174,7 +174,7 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>E &middot; M3 built</dd></div>
+    <div><dt>Revision</dt><dd>F &middot; M4 built</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
     <div><dt>Status</dt><dd>M3 green, 136 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
@@ -378,7 +378,7 @@ footer b{color:var(--ink-2);font-weight:600}
 │   ├── ui/
 │   │   ├── <b>controls.js</b>       <i>built &middot; five sliders, surface, live traction gauge</i>
 │   │   └── <b>assumptions.js</b>    <i>built &middot; the provenance drawer</i>
-│   ├── <b>scenarios.js</b>          <i>M4 &middot; scripted maneuvers as input timelines</i>
+│   ├── <b>scenarios.js</b>          <i>built &middot; M4 &middot; maneuvers as input timelines, and the body lag</i>
 │   ├── <b>m0-report.js</b>          <i>built &middot; headless harness, kept past M1 — see note</i>
 │   └── <b>app.js</b>                <i>built &middot; M1</i>
 ├── images/
@@ -406,7 +406,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <div class="ms-row done"><span class="ms-id">M1</span><div class="ms-b"><h3>Side elevation, cruise baseline</h3><p>Static reference state. Gravity, seat reaction, resting grip. The touchpoint map from table 1, rendered and labeled. <b>Done.</b> All twelve contacts placed on real anatomy, each selectable, each showing both directions of its force pair. Run it with <code>make loadpath</code>.</p></div><span class="ms-out">SVG side view<br>12 contacts</span></div>
     <div class="ms-row done"><span class="ms-id">M2</span><div class="ms-b"><h3>Contact solver and provenance drawer</h3><p>The unilateral QP replaces the placeholder split. The assumptions panel ships in the same milestone so no number is ever on screen without its source. <b>Done.</b> Solved through the dual, so a fourteen-variable program becomes a three-variable convex minimisation. Balance closes to under 10<sup>&minus;5</sup>&nbsp;N across the whole envelope. Two things went beyond what this plan specified &mdash; see below.</p></div><span class="ms-out">live force split<br>126 tests green</span></div>
     <div class="ms-row done"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so. <b>Done.</b> Grade is real rather than faked: gravity tilts into the cabin, which is why a hill presses you into the seat back while standing still. The plan view also surfaces the per-corner tyre loads the vehicle solver has computed since M0 and nothing had ever drawn.</p></div><span class="ms-out">2 views<br>5 inputs + surface</span></div>
-    <div class="ms-row"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
+    <div class="ms-row done"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous. <b>Done.</b> Playback is not a second code path &mdash; it is the same chain with its inputs coming from a clock. The lag sits between vehicle and occupant, so mid-maneuver the two drawings deliberately disagree and the gap is printed. It is a transient and nothing else: settled states are identical with it on or off, asserted to 1e&minus;6&nbsp;N per contact, and the frame loop stops requesting frames once it settles.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
     <div class="ms-row"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
     <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
   </div>
@@ -430,7 +430,10 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <p class="fix"><em>Mitigation</em>Every displayed value carries a provenance tag and an uncertainty band. The assumptions drawer ships in M2, not at the end.</p></div>
   <div class="risk"><h3>The quasi-static assumption hides the lag</h3>
     <p>Real occupants respond over 0.1 to 0.3 seconds. Flesh is compliant, foam has hysteresis, and you brace before the corner arrives. A quasi-static solver snaps instantly and will look crisper than any real drive.</p>
-    <p class="fix"><em>Mitigation</em>First-order lag filter on the body response in M4, with the time constant exposed as a labeled assumption.</p></div>
+    <p class="fix"><em>Mitigation</em>First-order lag filter on the body response in M4, with the time constant exposed as a labeled assumption. <b>Built, and it introduced a failure mode of its own:</b> a first-order lag approaches monotonically and can never overshoot, while a real torso on a compliant seat is second&nbsp;order and rocks past where it settles. The model now gives the delay and none of the rebound, which makes a hard stop look calmer than it feels. Recorded as MODEL.bodyLag, status placeholder. The guard against it becoming more than cosmetic is a test asserting that every settled state is identical with the lag on or off.</p></div>
+  <div class="risk"><h3>Speed and pedal demand are independent inputs</h3>
+    <p>Nothing in this model integrates acceleration into speed. A scripted maneuver can therefore ask for 0.8&nbsp;g of braking while the speed sits at 100&nbsp;km/h forever, and the solver will draw it without complaint &mdash; a timeline that looks entirely plausible and is physically incoherent. M4 made this reachable for the first time, because a hand-authored timeline has to get the arithmetic right in two places at once.</p>
+    <p class="fix"><em>Mitigation</em>Every preset is checked rather than trusted: each stretch of the speed profile must match the mean longitudinal acceleration the vehicle solver actually produces over that same stretch, with a negative-control test that feeds in a deliberately incoherent timeline and asserts it is caught. The check also forced a correction to the model itself &mdash; a stopped car cannot decelerate, so brake demand is now suppressed at zero speed rather than throwing a stationary occupant forward.</p></div>
   <div class="risk"><h3>The bicycle model flatters high steering angles</h3>
     <p>Ignoring tire slip means the cornering numbers stay optimistic exactly where a driver would be losing the car. Extrapolating past the friction limit produces confident nonsense.</p>
     <p class="fix"><em>Mitigation</em>Clamp at the friction ellipse and change the display state to "traction exceeded" rather than continuing to draw arrows.</p></div>
@@ -545,7 +548,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 </section>
 
 <footer>
-  <p><b>Driver Load Path</b> &middot; build plan, revision A &middot; <b>apps/loadpath</b> in the vibium repository.</p>
+  <p><b>Driver Load Path</b> &middot; build plan, revision F &middot; <b>apps/loadpath</b> in the vibium repository.</p>
   <p style="margin-top:8px">Prepared by <b>David Berkowitz</b>. Research and drafting with <b>Anthropic Claude</b>. Illustrations to be generated with <b>Google Gemini Nano Banana</b>.</p>
 </footer>
 </div>
