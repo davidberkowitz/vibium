@@ -1790,3 +1790,252 @@ extra steps, and it destroys the only thing an untuned output is good for.
 
 **Render it and look at it.** Four real defects in this milestone were invisible
 to a green test suite and obvious within two seconds of opening the page.
+
+---
+
+# Learning, part eight: M6, and the difference between a gate and a formality
+
+## Step 1 — What I set out to do, and the one sentence that governed all of it
+
+The plan had a gate written into it, months of milestones earlier:
+
+> If the M6 prototype does not look credible next to the 2D view, cut it and
+> ship the 2D view alone. That is a real outcome, not a failure.
+
+Most gates in most plans are decoration. Somebody writes "we'll evaluate and
+decide" because it sounds rigorous, and then evaluation day arrives, the thing
+has been built, and of course it ships — nobody deletes a week of work over a
+feeling. The gate exists to make the decision look considered, not to make it.
+
+The only way a gate is real is if you can say what would fail it *before* you
+look, and then actually look. This one could: the failure mode was named. A
+procedural human body will look wrong, and a body that looks wrong will
+undermine numbers that are right. That is specific enough to test.
+
+So my starting point was not "build the 3D view." It was "build enough of the
+3D view to find out whether the named failure mode happens." Those produce
+different code. The second one is allowed to be rough everywhere the gate isn't
+looking, and has to be honest exactly where it is.
+
+## Step 2 — The approach I took, and the trapdoor in it
+
+I made two departures from the plan immediately.
+
+**No three.js.** The app has no dependencies, no build step, and runs by opening
+a file. The README promises that out loud. Adding a 3D library for a view the
+plan says might be cut spends the project's cleanest property on its least
+certain milestone. What a 3D view actually needs is: rotate points, project
+them, sort by depth. That is about a hundred lines. I wrote them.
+
+I still think this was right, and I'd do it again.
+
+**No mesh — a stick skeleton instead.** Here is where I was clever, and being
+clever is how you walk into a trapdoor. My reasoning went: the gate warns about
+a procedural *human*. Nothing else in this app is figurative — the side
+elevation and the plan are drafting diagrams. So a 3D drawing in the same
+language, a stick skeleton with joints and bones, cannot fail the way a failed
+human fails, because it isn't attempting a human. It's attempting a drawing, and
+it should be held to a drawing's standard.
+
+That argument is coherent. It is also, in retrospect, a very elaborate way of
+saying "the gate doesn't apply to me." Which is exactly what everyone says.
+
+## Step 3 — What the render actually showed, which is the whole point of rendering it
+
+I built it: nineteen joints, eighteen bones, reclined torso, thighs forward,
+one foot on the pedals and one on the footrest, because a real driver's legs are
+not symmetric. Twelve contact markers sized by the load crossing them. Seat
+planes, a steering wheel ring, a ground grid, an axis tripod. Fifteen tests.
+All green. Zero JS errors. Then I drove a headless browser to a combined
+brake-and-turn — the case that justifies the view existing — and looked at it.
+
+It read as a stick insect.
+
+Not catastrophically. If you already knew it was a seated driver you could
+reconstruct it: that's the torso, those are arms reaching to the wheel, those are
+legs going down to the pedals. But *knowing in order to see* is precisely the
+failure. The side elevation next to it needs no such favour; you look at it and
+a person is sitting in a car.
+
+I tried six camera angles. Not one of them fixed it. The arms splay into an open
+V at every yaw between −0.4 and −1.25 radians, because from any three-quarter
+view a pair of arms reaching forward and outward to a wheel is a shape with no
+silhouette. That is geometry, not tuning.
+
+So: the gate fired. On a stick skeleton, not a mesh, for exactly the reason the
+gate named.
+
+## Step 4 — The mess: I made it worse before I made it better, and I nearly blamed the concept
+
+Between the first render and the verdict I did two rounds of changes, and the
+second round was worse than what it replaced. I made the seat panels opaque, so
+they swallowed the skeleton. I scaled the scene up past its container, so the
+legs ran off the bottom and the caption vanished. I put the new projection
+labels at the projected arrow tips, which in a scene that is dense in the middle
+by construction meant printing words across the torso.
+
+And then I very nearly wrote the verdict.
+
+This is the part I want to remember. I had a clean narrative available — "the
+prototype failed the gate" — and a render in front of me that supported it, and
+the render was bad *because of changes I had just made*. If I had written the
+verdict there, it would have been a true conclusion reached by a corrupt route,
+and I would not have known the difference.
+
+What I did instead was boring and correct: fix my own mistakes first, render
+again, and only then judge. The concept doesn't get blamed for my scaling bug.
+
+After the fixes, the render was much better — and the skeleton was still a
+zigzag. Same verdict, now actually earned.
+
+## Step 5 — The experiment that settled it, which took ninety seconds
+
+I stopped arguing with myself and ran the obvious test. I injected three lines
+of CSS into the live page — `.sc-bone, .sc-joint, .sc-head { display: none }` —
+and re-rendered.
+
+It was immediately, unambiguously better. Seat planes, floor, steering wheel,
+twelve contact markers where the car actually touches a driver, the force vector
+and its projections. It looked like it belonged beside the other two drawings.
+
+Ninety seconds of CSS answered a question I'd been circling for two rounds of
+real edits. The lesson isn't "use CSS." It's that when you're asking "is it X
+that's wrong, or the whole thing?", the cheapest possible version of *delete X
+and look* usually exists, and you should reach for it before you reach for a
+refactor or a verdict.
+
+So the verdict split. Not go, not no-go: **the view goes, the body is cut.**
+
+## Step 6 — The thing that actually made the view worth keeping, which the plan never specified
+
+Cutting the skeleton left a problem the plan never anticipated. Without a body,
+what is the view *for*? "Here is a 3D picture" is not a reason. The plan's answer
+was that the side elevation carries x and z, the plan carries x and y, and
+neither can show the true direction of a force that has all three components at
+once — which the side view has admitted with a ⊗ symbol since M1.
+
+Fine. But I drew that vector, and then I looked at the number: 976 N total, of
+which 765 N is just holding the body up against gravity. So the arrow points
+very nearly straight up. In steady cruise it also points very nearly straight
+up. A viewer cannot tell the combined case from the boring case by looking.
+
+The caption was asserting the gap. The picture was not showing it. And a caption
+cannot be wrong in a way that anything notices.
+
+The fix is the thing I'm most pleased with in this milestone. Draw the same
+vector three times, from one origin, at one scale:
+
+- whole — the real force;
+- with the lateral axis zeroed — everything the side elevation can hold;
+- with the vertical zeroed — everything the plan can hold.
+
+Same scale is what makes it work. The projections come out visibly shorter,
+visibly pointing elsewhere, and a thin line from each projected tip to the true
+tip is the discarded component, drawn. Each gets a label: the angle the force
+leans out of that drawing's plane, `asin` of the component it cannot hold. In a
+combined brake-and-turn, the side elevation misses 31° of the force and the plan
+misses 52°.
+
+That is the ⊗ finally measured instead of admitted. It is the only reason this
+view earns a place beside two drawings that were already doing their jobs — and
+the plan didn't ask for it. Prototypes are supposed to teach you things the plan
+didn't know.
+
+## Step 7 — Three bugs, and what each one says about how I was checking
+
+**The label that was a lie.** Under the resultant I'd hard-coded
+"all three axes at once". True for the combined case I wrote it against. In
+steady cruise the force is 765 N of pure weight support — one axis — sitting
+under a label claiming three. No test caught it, because I hadn't written a test
+for a string I'd typed by hand. It's now derived from the components (any axis
+under 1% of the resultant is rounding, not an axis) and there's a test with five
+cases. **A label that doesn't come from the data is a caption impersonating a
+readout.**
+
+**The tripod that silently collapsed.** The axis tripod was drawn by projecting
+two points and subtracting the frame centre — which works only while the
+projector maps the world origin to the frame centre. I added a framing offset to
+stop the drawing sitting in the right half of an empty frame, and the tripod
+quietly folded into a corner with z invisible. All tests still passed: they
+exercise the projector, which was fine. They don't look at the legend. It's now
+drawn from screen *deltas*, which have no origin to get wrong.
+
+**The one that matters most: the views that never hid.** The 2D/3D switch set
+`hidden` on the figures, and I verified it by reading the property back — which
+returned `true`, so I moved on. But `.figures { display: flex }` in the
+stylesheet beats the browser's `[hidden] { display: none }`, because any author
+rule wins. The 2D drawings were painted the whole time, at every width. I only
+found it in a phone screenshot, where they appeared below the 3D pane instead of
+scrolled off the bottom of a desktop.
+
+**I checked the property and the property was not the thing.** The thing was
+whether pixels were painted. Every subsequent check in this milestone measures
+`getBoundingClientRect().height` and computed `display` instead — what is on
+screen, not what the DOM says should be.
+
+## Step 8 — What an expert notices here
+
+**A passing test suite is a statement about the claims you thought to write
+down.** The skeleton had two tests: no bone references a missing joint, and the
+body is symmetric everywhere except the legs. Both correct, both green, both
+irrelevant to the question on trial. Green tests told me it was self-consistent.
+Nothing in the repository could tell me it was illegible. That required a
+screenshot and a judgement, and no amount of coverage substitutes for it.
+
+**Gravity swamps the signal, and that's a design fact, not a physics fact.**
+Everyone knows the weight term dominates a 1-g-ish load case. Fewer people
+notice what it means for a *drawing*: if your one visual channel is arrow
+direction, and 78% of the magnitude is a constant pointing up, then the channel
+carries almost no information. Recognising that the picture was uninformative
+even though the number was right is the difference between shipping a chart and
+shipping a decoration.
+
+**Right conclusion, corrupt route, and knowing the difference.** I nearly wrote
+the correct verdict off a render I had personally broken. The conclusion would
+have survived review — the skeleton really did fail — and I still would have
+been reasoning badly. Experts separate "was I right?" from "was I entitled to
+be?", because only the second one generalises.
+
+**Same-scale is the whole trick.** Drawing a projection at its own convenient
+size would have made a prettier figure and destroyed the argument. The claim is
+about *how much* each drawing misses; the shortening is the evidence. Preserving
+a common scale across compared quantities is the single most reliable thing that
+separates an honest chart from a persuasive one.
+
+## Step 9 — What transfers
+
+**Write the failure condition before you build the thing.** A gate that says
+"we'll evaluate" evaluates nothing. A gate that says "procedural bodies look
+wrong, and a wrong-looking body undermines right numbers" is a prediction, and
+predictions can fire. When you plan anything with an uncertain outcome — a
+migration, a rewrite, a hire, a feature — write down in advance what would make
+you stop. Then you only have to be honest once, instead of brave later.
+
+**"That warning doesn't apply to my version" is what everyone says.** I
+substituted a stick skeleton for a mesh and argued the gate was about meshes. The
+argument was coherent and wrong. When you find yourself constructing a careful
+case for why a known failure mode exempts you, that is data about you, not about
+the failure mode.
+
+**Fix your own mess before you judge the work.** The gap between "this is bad"
+and "I made this bad in the last twenty minutes" is invisible from inside. Undo
+your recent changes, look again, *then* decide.
+
+**The cheapest possible experiment usually exists.** Before a refactor or a
+verdict, ask: what's the crudest thing that would answer this? Three lines of
+injected CSS settled a question two rounds of real edits hadn't.
+
+**Check the outcome, not the mechanism.** `hidden === true` is a mechanism.
+"Is it painted?" is the outcome. Assertions that read back the flag you just set
+are the most common way a green suite lies — they test that assignment works.
+
+**Partial cuts are usually the right answer.** The gate offered go or no-go. The
+truth was that one half was excellent and the other half was a liability, and
+shipping is not a package deal. Most "should we ship this?" arguments are
+actually unasked questions about which part.
+
+**Prototypes are supposed to surprise you.** The best thing in this milestone —
+the decomposition with its measured angles — is not in the plan. The plan said
+build a figure to show a vector. Building it taught me the vector needed showing
+in a way a figure couldn't do. If a prototype only confirms the plan, you
+learned nothing and could have skipped it.

@@ -53,6 +53,8 @@
   var Transport = global.LoadPathTransport;
   var Vib = global.LoadPathVibration;
   var Spectrum = global.LoadPathSpectrum;
+  var Scene3D = global.LoadPathScene3D;
+  var Anat = global.LoadPathAnatomy;
 
   var CAR = C.VEHICLES.sedan;
   var DRIVER = C.OCCUPANTS.m50;
@@ -72,6 +74,11 @@
      loop: an idle page should burn no frames, and a settled screenshot should
      be bit-identical to the same state reached by slider alone. */
   var SETTLE = 0.02;          // m/s^2
+
+  /* M6 camera. Default is a three-quarter view from the driver's front-left:
+     far enough round to read as 3D, close enough to zero yaw that the shape
+     still resembles the side elevation the reader already knows. */
+  var cam = { yaw: -1.02, pitch: 0.30, mode: '2d' };
 
   function n1(x) { return x.toFixed(1); }
   function load(id) {
@@ -328,6 +335,7 @@
     selectedId = id;
     if (sideView) sideView.highlight(id);
     if (planView) planView.highlight(id);
+    if (cam.mode === '3d') draw3D();
     renderDetail(id);
     var rows = document.querySelectorAll('#contact-rows .contact-row');
     for (var i = 0; i < rows.length; i++) {
@@ -349,6 +357,7 @@
                            cur.occupant, cur.split, function (id) { select(id); });
 
     Spectrum.render(document.getElementById('spectrum'), cur.vibration);
+    if (cam.mode === '3d') draw3D();
 
     renderState();
     renderVibration();
@@ -356,6 +365,70 @@
     renderSegments();
     if (controls) controls.updateGauge(cur.vehicle, inputs.mu);
     if (selectedId) select(selectedId); else renderDetail(null);
+  }
+
+  function draw3D() {
+    var out = Scene3D.render(document.getElementById('scene3d'), {
+      yaw: cam.yaw, pitch: cam.pitch,
+      occupant: cur.occupant, split: cur.split, vehicle: cur.vehicle,
+      selected: selectedId,
+      onPick: function (id) { select(id); }
+    });
+    /* The narrow-screen readout, from the same return value the scene drew
+       from. Two renderings of one fact, never two facts. */
+    var el = document.getElementById('scene3d-readout');
+    if (!el) return;
+    if (!out || !(out.magnitude > 0)) { el.textContent = ''; return; }
+    el.innerHTML = '<b>' + out.magnitude.toFixed(0) + ' N</b> \u00b7 ' + out.axes +
+      '<span>side elevation sees it, and misses <b>' +
+      out.missSideDeg.toFixed(0) + '\u00b0</b></span>' +
+      '<span>plan sees it, and misses <b>' +
+      out.missPlanDeg.toFixed(0) + '\u00b0</b></span>';
+  }
+
+  /* Orbit. Pointer events so a trackpad drag, a mouse and a touch screen all
+     work without three separate handlers. */
+  function mountOrbit() {
+    var host = document.getElementById('scene3d');
+    var dragging = false, lastX = 0, lastY = 0;
+    host.addEventListener('pointerdown', function (ev) {
+      if (ev.target.classList.contains('sc-contact')) return;   // let picks pick
+      dragging = true; lastX = ev.clientX; lastY = ev.clientY;
+      host.setPointerCapture(ev.pointerId);
+    });
+    host.addEventListener('pointermove', function (ev) {
+      if (!dragging) return;
+      cam.yaw += (ev.clientX - lastX) * 0.01;
+      /* Pitch is clamped short of straight down. Past vertical the scene turns
+         inside out and the axis tripod starts lying about which way is up. */
+      cam.pitch = Math.max(-0.2, Math.min(1.25, cam.pitch + (ev.clientY - lastY) * 0.006));
+      lastX = ev.clientX; lastY = ev.clientY;
+      draw3D();
+    });
+    ['pointerup', 'pointercancel'].forEach(function (e) {
+      host.addEventListener(e, function () { dragging = false; });
+    });
+  }
+
+  function mountViewSwitch() {
+    var note = document.getElementById('vs-note');
+    var pane = document.getElementById('pane-3d');
+    var figs = document.querySelector('.figures');
+    [].forEach.call(document.querySelectorAll('.vs-btn'), function (b) {
+      b.addEventListener('click', function () {
+        cam.mode = b.getAttribute('data-view');
+        [].forEach.call(document.querySelectorAll('.vs-btn'), function (o) {
+          o.classList.toggle('on', o === b);
+        });
+        var is3d = cam.mode === '3d';
+        pane.hidden = !is3d;
+        figs.hidden = is3d;
+        note.textContent = is3d
+          ? 'one resultant, and what each 2D drawing misses of it'
+          : 'the side elevation and the plan, as built';
+        if (is3d) draw3D();
+      });
+    });
   }
 
   /* ---------------- the frame loop ----------------
@@ -440,6 +513,8 @@
       onModeChange: function () { wake(); },
       onLagChange: function () { wake(); }
     });
+    mountViewSwitch();
+    mountOrbit();
     renderCaveats();
     seek(controls.read());
 

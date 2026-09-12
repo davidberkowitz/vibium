@@ -402,6 +402,13 @@ button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--re
 }
 .limit-banner[hidden] { display: none; }
 
+/* [hidden] must come with the display rule. `.figures { display: flex }` beat
+   the UA stylesheet's [hidden]{display:none} — any author display wins — so the
+   view switch set the attribute, reported hidden:true when asked, and drew both
+   views anyway. It read as working on a desktop only because the 3D pane pushed
+   the 2D figures below the fold. Checking the PROPERTY is what hid it; a phone
+   screenshot is what found it. */
+.figures[hidden] { display: none; }
 .figures { display: flex; gap: 20px; align-items: flex-start; min-width: 0; }
 .fig-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .fig-col:first-child { flex: 1 1 55%; }
@@ -491,3 +498,68 @@ button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--re
 .vb .bar { flex: none; width: 66px; height: 4px; background: var(--bg-sunk); border-radius: 2px; }
 .vb .bar i { display: block; height: 100%; background: var(--vib); border-radius: 2px; }
 .ctl-road .seg-btn { min-width: 26px; padding-left: 7px; padding-right: 7px; }
+
+
+/* ---- M6: the 3D view, gated ---- */
+.view-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.vs-btn {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg-dim);
+  border-radius: 3px; padding: 4px 12px; font-size: 11.5px; cursor: pointer;
+  font-family: inherit;
+}
+.vs-btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+.vs-btn.on { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
+.vs-note { font-size: 11.5px; color: var(--line-strong); margin-left: 4px; }
+#pane-3d[hidden] { display: none; }
+/* user-select off: orbiting is a drag, and a drag across the legend was
+   selecting the label text and leaving it highlighted behind the scene. */
+.scene3d { display: block; width: 100%; max-width: 940px; height: auto; cursor: grab;
+           -webkit-user-select: none; user-select: none; }
+.scene3d:active { cursor: grabbing; }
+.sc-grid { stroke: var(--line); stroke-width: 1; opacity: .5; }
+.sc-panel { fill: #1a222d; fill-opacity: .5; stroke: var(--line-strong); stroke-width: 1.3; }
+.sc-wheel { fill: none; stroke: #556579; stroke-width: 2.5; }
+.sc-bone { stroke: var(--fg-dim); stroke-width: 3; stroke-linecap: round; opacity: .85; }
+.sc-joint { fill: var(--fg-dim); }
+.sc-head { fill: var(--bg-soft); stroke: var(--fg-dim); stroke-width: 2.5; }
+.sc-contact { fill: var(--act); cursor: pointer; }
+.sc-contact.idle { fill: var(--line-strong); }
+.sc-contact.sel { fill: var(--act); }
+.sc-ring { fill: none; stroke: var(--act); stroke-width: 1.5; opacity: .8; }
+.sc-resultant { stroke: var(--act); stroke-width: 3; }
+.sc-com { fill: var(--fg); }
+.sc-resultant-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+  fill: var(--act); font-weight: 600;
+}
+.sc-resultant-sub { font-size: 10.5px; fill: var(--fg-dim); }
+
+/* The two projections are the SAME quantity one axis poorer, not a second
+   category, so they keep --act and separate by weight and dash — the same rule
+   the spectrum chart uses for its unweighted trace. Identity never rests on
+   colour alone here either: both are directly labelled. */
+.sc-proj { stroke: var(--act); stroke-width: 1.6; opacity: .62; stroke-dasharray: 6 4; }
+.sc-drop { stroke: var(--fg-dim); stroke-width: 1; opacity: .42; stroke-dasharray: 2 3; }
+.sc-proj-label { font-size: 10.5px; fill: var(--act); opacity: .85; }
+.sc-proj-label.dim { fill: var(--fg-dim); opacity: .9; }
+.sc-leader { stroke: var(--line-strong); stroke-width: 1; opacity: .55; }
+.sc-axis-note { font-size: 9.5px; fill: var(--line-strong); }
+
+/* The scene's legend lives in SVG units, so it shrinks with the drawing: at
+   390px wide the 880-unit viewBox scales by 0.44 and 10.5px type renders at
+   under 5px. Below 760px the in-scene legend is dropped and the same three
+   facts are read from the HTML block under the figure, which is real text at
+   real size — and which is fed from the same render() return, so the two can
+   never disagree about a number. */
+.sc-readout { display: none; margin-top: 6px; font-size: 12px; color: var(--fg-dim); }
+.sc-readout b { color: var(--act); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sc-readout span { display: block; margin-top: 3px; }
+@media (max-width: 760px) {
+  .sc-legend { display: none; }
+  .sc-readout { display: block; }
+}
+.sc-axis { stroke: var(--line-strong); stroke-width: 1.5; }
+.sc-axis-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+  fill: var(--fg-dim);
+}

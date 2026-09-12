@@ -3,8 +3,9 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M5 built and green.** Two views, five live inputs, four scripted maneuvers, a
-separate vibration channel, and the solver running behind them, with 191 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M6 judged; the view ships, the figure does not.** Three views, five live inputs, four
+scripted maneuvers, a separate vibration channel, and the solver running behind them, with 212
+passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -29,6 +30,32 @@ pushes back into the car.
 
 Emergency and crash loading is explicitly **out of scope**. Different data sources, much higher
 stakes on accuracy, and it deserves its own project if it is ever wanted.
+
+## A third view, and the half of it that was cut
+
+M6 was gated from the start: the plan said build the 3D view as a prototype and cut it if it did
+not look credible beside the 2D drawings, because a body that looks wrong undermines numbers that
+are right. It was built. **The verdict was a split — the view ships, the figure was cut.**
+
+There was a figure, briefly: a stick skeleton, nineteen joints, seated driving posture, one foot
+on the pedals. Rendered at six camera angles it read as an ambiguous zigzag at all six. Beside the
+side elevation, which is legible in a glance, it was worse rather than better — and a viewer
+squinting at a body is a viewer not reading the vector. Its two unit tests passed the entire time.
+That is the part worth remembering: the tests could say the skeleton was self-consistent and could
+not say it was legible, and legibility was the thing on trial.
+
+What survived is everything that is not a body — the twelve contacts at their real positions, the
+cabin planes that locate them, one force — and the thing that earned the view its place. Drawing
+the resultant alone was not checkable: at 976 N with 765 N of that merely holding you up, the
+arrow points nearly straight up whatever the car is doing. So the same vector is drawn three times
+from one origin at one scale: whole, with the lateral axis dropped (all the side elevation can
+hold), and with the vertical dropped (all the plan can hold). The projections come out visibly
+shorter and pointing elsewhere, each labelled with the angle it misses. In a combined brake-and-turn
+the side elevation misses 31° of the force and the plan misses 52°. That is the ⊗ in the side view,
+finally measured rather than admitted.
+
+No three.js. The projector is about a hundred lines of rotate-project-sort, which keeps the promise
+that this runs from `file://` with nothing installed.
 
 ## Two views, because one cannot be honest on its own
 
@@ -242,7 +269,7 @@ goes — they are absorbing kinematics the model does not have.
 | **M3** | Plan view and live sliders | **done** — 10 tests |
 | **M4** | Scripted playback and body lag | **done** — 26 tests |
 | **M5** | Vibration overlay | **done** — 29 tests |
-| M6 | 3D toggle | next — gated, may be cut |
+| **M6** | 3D toggle | **done, split** — 21 tests. View kept, body cut |
 
 M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
 right number rendered plainly, because the polish buys it credibility it hasn't earned.
@@ -362,8 +389,10 @@ apps/loadpath/
 │   ├── occupant.js      EQ 5-6: segment masses, required force, third-law audit
 │   ├── contacts.js      the indeterminate split, box-constrained QP
 │   ├── scenarios.js     maneuvers as input timelines, and the body lag
-│   └── vibration.js     the separate frequency-domain channel
-├── js/view2d/           side elevation, plan view, shared SVG helpers
+│   ├── vibration.js     the separate frequency-domain channel
+│   └── anatomy.js       where the twelve contacts are, in metres
+├── js/view2d/           side elevation, plan view, spectrum, shared SVG helpers
+├── js/view3d/scene.js   the resultant, and what each 2D drawing misses of it
 ├── js/ui/               controls, transport bar, assumptions drawer
 ├── js/app.js            the one solve, and the one frame loop
 ├── js/m0-report.js      headless harness, kept past M1

@@ -10,7 +10,7 @@
 <body>
   <header id="toolbar">
     <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
-    <span class="milestone">M5 · vibration</span>
+    <span class="milestone">M6 · 3D gate</span>
     <div class="spacer"></div>
     <span id="readout" class="readout"></span>
     <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
@@ -22,6 +22,31 @@
 
   <main id="stage">
     <section id="figure-wrap">
+      <div class="view-switch">
+        <button type="button" class="vs-btn on" data-view="2d">Two views</button>
+        <button type="button" class="vs-btn" data-view="3d">3D</button>
+        <span class="vs-note" id="vs-note">the side elevation and the plan, as built</span>
+      </div>
+      <div id="pane-3d" hidden>
+        <h2 class="fig-title">The resultant, in three dimensions <span>drag to orbit</span></h2>
+        <div id="scene3d"></div>
+        <p class="sc-readout" id="scene3d-readout"></p>
+        <p class="caption">
+          The side elevation carries x and z; the plan carries x and y. Between
+          them they cover all three axes but never at once, and in a
+          <strong>combined maneuver</strong> — braking while turning — the force
+          into the driver has all three components simultaneously. So the same
+          vector is drawn three times here from one origin at one scale: whole,
+          then with the lateral axis dropped (all the side elevation can hold),
+          then with the vertical dropped (all the plan can hold). The dashed
+          arrows are visibly shorter and point somewhere else; the angle on each
+          is how far the force leans out of that drawing's plane. That is what
+          the &otimes; in the side view has been admitting since M1, measured.
+          There is no body in this view: a figure was built, and cut, because at
+          every camera angle it read as a zigzag rather than a driver and drew
+          the eye away from the one thing the view is for.
+        </p>
+      </div>
       <div class="figures">
         <div class="fig-col">
           <h2 class="fig-title">Side elevation <span>vertical and fore-aft</span></h2>
@@ -125,10 +150,12 @@
   <script src="js/model/contacts.js"></script>
   <script src="js/model/scenarios.js"></script>
   <script src="js/model/vibration.js"></script>
+  <script src="js/model/anatomy.js"></script>
   <script src="js/view2d/vectors.js"></script>
   <script src="js/view2d/side.js"></script>
   <script src="js/view2d/plan.js"></script>
   <script src="js/view2d/spectrum.js"></script>
+  <script src="js/view3d/scene.js"></script>
   <script src="js/ui/assumptions.js"></script>
   <script src="js/ui/controls.js"></script>
   <script src="js/ui/transport.js"></script>
