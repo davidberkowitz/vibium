@@ -57,11 +57,24 @@
     snow: { label: 'Packed snow', mu: 0.25 }
   };
 
-  var OCCUPANTS = {
-    m50: { label: '50th percentile male',   mass: 78 },
-    f05: { label: '5th percentile female',  mass: 49 },
-    m95: { label: '95th percentile male',   mass: 101 }
-  };
+  /* Occupant mass, as a RANGE rather than as named people.
+
+     This used to be three presets: "50th percentile male", "5th percentile
+     female", "95th percentile male". Every one of them multiplied the same
+     SEGMENTS table, which comes from Dempster's sample of nine male cadavers.
+     Changing the total mass does not change the proportions, so the "female"
+     preset was a scaled male wearing a label that claimed otherwise — and the
+     label is the part a reader believes. The plan flagged this at M0 and set a
+     precondition: source sex-specific fractions, or relabel and stop implying
+     a body type. Sourcing was attempted at M7 and failed — de Leva (1996),
+     which carries both sexes, is behind hosts this environment cannot reach,
+     and reconstructing its numbers from memory is exactly the mistake M5
+     taught. So the fallback branch: mass is a number, and the app now says
+     only what it can support.
+
+     The range is deliberately wider than any percentile table, because it is
+     no longer pretending to index one. */
+  var OCCUPANT_MASS = { min: 40, max: 130, step: 1, value: 78 };
 
   /* ---- M5: the vibration channel ----
      Separate constants from the force model on purpose. Nothing here has units
@@ -146,15 +159,20 @@
       source: 'Passenger tyre on wet asphalt, representative peak.' },
     'SURFACES.snow.mu': { value: 0.25, unit: 'dimensionless', status: 'design',
       source: 'Passenger tyre on packed snow, representative peak.' },
-    'OCCUPANTS.m50.mass': { value: 78, unit: 'kg', status: 'design',
-      source: 'Nominal 50th percentile adult male occupant mass.',
-      caveat: 'Not yet checked against a percentile table; treat as a round number.' },
-    'OCCUPANTS.f05.mass': { value: 49, unit: 'kg', status: 'design',
-      source: 'Nominal 5th percentile adult female occupant mass.',
-      caveat: 'Not yet checked against a percentile table; treat as a round number.' },
-    'OCCUPANTS.m95.mass': { value: 101, unit: 'kg', status: 'design',
-      source: 'Nominal 95th percentile adult male occupant mass.',
-      caveat: 'Not yet checked against a percentile table; treat as a round number.' },
+    'OCCUPANT_MASS.value': { value: 78, unit: 'kg', status: 'design',
+      source: 'Default occupant mass, a round mid-range adult figure.',
+      caveat: 'A mass, and only a mass. It indexes no population and names no ' +
+              'body type. Three named presets stood here until M7, each one ' +
+              'claiming a sex and a size; all three multiplied the same ' +
+              'segment fractions, which come from one sample of nine male ' +
+              'cadavers, so only the total ever changed. Sourcing fractions ' +
+              'for more than one body was attempted and the sources were ' +
+              'unreachable from this environment, so the labels went rather ' +
+              'than the numbers acquiring a meaning they had not earned.' },
+    'OCCUPANT_MASS.range': { value: '40 to 130', unit: 'kg', status: 'design',
+      source: 'A span wide enough to cross the bracing threshold in both ' +
+              'directions for ordinary maneuvers, which is the one place mass ' +
+              'changes the answer qualitatively rather than by a scale factor.' },
     'MODEL.lateralTransferSplit': {
       unit: 'fraction', status: 'placeholder',
       source: 'Lateral load transfer is split between axles in proportion to static ' +
@@ -342,7 +360,7 @@
     SEGMENTS: SEGMENTS,
     VEHICLES: VEHICLES,
     SURFACES: SURFACES,
-    OCCUPANTS: OCCUPANTS,
+    OCCUPANT_MASS: OCCUPANT_MASS,
     ROAD: ROAD,
     ISO2631: ISO2631,
     RIDE: RIDE,

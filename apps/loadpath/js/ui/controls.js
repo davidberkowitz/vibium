@@ -51,7 +51,26 @@
       unit: '%', format: function (v) {
         if (v === 0) return 'level';
         return Math.abs(v) + '% ' + (v > 0 ? 'uphill' : 'downhill');
-      } }
+      } },
+    /* M7. The odd one out in this list, and knowingly so: every other slider
+       is something the driver DOES and this is something the driver IS. It
+       sits here anyway because it belongs to the same solve and a reader
+       should be able to move it and watch the load path change.
+
+       Note what it is NOT called. Three named presets stood here — a 50th
+       percentile male, a 5th percentile female, a 95th percentile male — all
+       multiplying the same segment fractions taken from nine male cadavers.
+       The number changed and the body never did, so the labels claimed a
+       thing the model cannot do. It is a mass now, and it says so.
+
+       It is also deliberately NOT part of a scenario timeline: a maneuver is
+       a sequence of driver actions, and who is sitting there does not change
+       halfway through a lane change. show() only touches keys it is given, so
+       loading a preset leaves this alone. */
+    { id: 'bodyMass', label: 'Occupant', min: C.OCCUPANT_MASS.min,
+      max: C.OCCUPANT_MASS.max, step: C.OCCUPANT_MASS.step,
+      value: C.OCCUPANT_MASS.value, unit: 'kg',
+      format: function (v) { return v.toFixed(0) + ' kg'; } }
   ];
 
   var state = {};
@@ -72,6 +91,7 @@
       brake: state.brake,
       throttle: state.throttle,
       gradePercent: state.gradePercent,
+      bodyMass: state.bodyMass,
       surface: state.surface,
       mu: C.SURFACES[state.surface].mu,
       /* A vibration input and nothing else. It reaches the vibration solver and

@@ -57,7 +57,11 @@
   var Anat = global.LoadPathAnatomy;
 
   var CAR = C.VEHICLES.sedan;
-  var DRIVER = C.OCCUPANTS.m50;
+  /* M7. No DRIVER constant any more. Occupant mass is an input like the
+     others, read from the controls on every solve, because it is a thing a
+     reader is meant to move. The default lives in constants with its
+     provenance record. */
+  var DEFAULT_MASS = C.OCCUPANT_MASS.value;
 
   var sideView = null, planView = null, controls = null, transport = null;
   var selectedId = null;
@@ -103,12 +107,30 @@
        supposed to show that rather than average it away: the corner loads have
        already moved while the body is still arriving. */
     var a = bodyAccel || vehicle.accel;
+    var bodyMass = inputs.bodyMass || DEFAULT_MASS;
     var occupant = O.solve({
-      bodyMass: DRIVER.mass,
+      bodyMass: bodyMass,
       accel: O.vec(a.x, a.y, 0),
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
     var split = K.solve(occupant.carOnBody);
+
+    /* M7. The mass at which THIS maneuver exhausts the driver's bracing and
+       the webbing takes up. It is a property of the maneuver rather than of
+       the occupant, which is the point: the slider is being compared against
+       it. Cheap enough to recompute per frame — about forty solves of a
+       three-variable minimisation — and it must be per frame, because it moves
+       whenever the maneuver does. */
+    var threshold = K.bracingThreshold({
+      min: C.OCCUPANT_MASS.min, max: C.OCCUPANT_MASS.max,
+      requiredForMass: function (m) {
+        return O.solve({
+          bodyMass: m,
+          accel: O.vec(a.x, a.y, 0),
+          gravity: O.gravityForGrade(inputs.gradePercent)
+        }).carOnBody;
+      }
+    });
 
     /* The vibration channel. It takes the SPEED and the ROAD CLASS and nothing
        else — not the acceleration, not the lagged body state, and certainly not
@@ -117,7 +139,8 @@
     var vibration = Vib.solve({ speed: inputs.speed, roadClass: inputs.roadClass });
 
     return { inputs: inputs, vehicle: vehicle, occupant: occupant,
-             split: split, vibration: vibration };
+             split: split, vibration: vibration,
+             bodyMass: bodyMass, threshold: threshold };
   }
 
   /* ---------------- panel ---------------- */
@@ -133,6 +156,32 @@
       : 0;
     var r = v.turnRadius;
 
+    /* M7. Two readouts that only became sayable once mass was an input.
+
+       The belts row has always reported slack or engaged. What it could never
+       say is WHY, because with one hard-coded occupant there was nothing to
+       compare against. The threshold is the missing half: demand scales with
+       mass and the bracing budget does not, so every maneuver has a mass where
+       a driver runs out of arm and leg and the webbing takes over. Below it
+       you hold yourself; above it the car holds you.
+
+       Reported as a mass and not a verdict — no "too heavy", nothing about the
+       person. It is a property of the maneuver. */
+    function thresholdText() {
+      var t = cur.threshold;
+      if (!t) return 'never';
+      if (t.atFloor) return 'any occupant';
+      return t.mass.toFixed(0) + ' kg';
+    }
+    function beltNote() {
+      var t = cur.threshold, m = cur.bodyMass;
+      if (!t) return 'nothing here needs the webbing at any mass';
+      if (t.atFloor) return 'this maneuver belts everyone';
+      return cur.split.slackEngaged
+        ? 'at ' + m.toFixed(0) + ' kg the bracing budget is spent'
+        : 'holding on, with ' + (t.mass - m).toFixed(0) + ' kg of margin';
+    }
+
     var rows = [
       ['Apparent g-load', s.gLoad.toFixed(2) + ' g', 'you always feel 1 g at rest'],
       ['Longitudinal', (v.accel.x / C.G).toFixed(2) + ' g', v.accel.x < -0.01 ? 'braking' : (v.accel.x > 0.01 ? 'accelerating' : 'steady')],
@@ -143,7 +192,8 @@
       ['Traction used', (v.utilisation * 100).toFixed(0) + ' %', v.tractionExceeded ? 'DEMAND EXCEEDS GRIP' : 'within the friction ellipse'],
       ['Car → driver', n1(O.magnitude(s.carOnBody)) + ' N', 'total across all contacts'],
       ['Contacts carrying load', loaded + ' of 12', 'the rest are idle or slack'],
-      ['Belts', cur.split.slackEngaged ? 'engaged' : 'slack', 'webbing takes up only when bracing runs out'],
+      ['Belts', cur.split.slackEngaged ? 'engaged' : 'slack', beltNote()],
+      ['Bracing runs out at', thresholdText(), 'for this maneuver, whoever is driving'],
       ['Third-law residual', audit.worst.toExponential(1) + ' N', 'checked, not assumed'],
       ['Split balance residual', bal ? bal.residual.toExponential(1) + ' N' : '—', 'the split re-sums to the total']
     ];
@@ -349,7 +399,8 @@
     cur.lagErr = lagErr || 0;
 
     document.getElementById('readout').textContent =
-      CAR.label + ' · ' + DRIVER.label + ' · ' + C.SURFACES[inputs.surface].label.toLowerCase();
+      CAR.label + ' · ' + (inputs.bodyMass || DEFAULT_MASS).toFixed(0) +
+      ' kg occupant · ' + C.SURFACES[inputs.surface].label.toLowerCase();
 
     sideView = Side.render(document.getElementById('figure'), cur.occupant,
                            function (id) { select(id); }, cur.split);
@@ -451,7 +502,7 @@
 
     if (transport && transport.isPlaying()) {
       transport.advance(dt);
-      target = transport.inputs();
+      target = withOccupant(transport.inputs());
       controls.show(target);
     }
 
@@ -474,6 +525,32 @@
     else lastT = 0;
   }
 
+  /* A scenario timeline carries only the channels a driver operates: speed,
+     steering, the two pedals, grade. Occupant mass is not one of them, on
+     purpose — who is sitting there does not change halfway through a lane
+     change. But that means transport.inputs() comes back WITHOUT it, and
+     anything downstream that reads inputs.bodyMass falls through to the
+     default.
+
+     That shipped for about ten minutes and a screenshot caught it: the slider
+     read 110 kg while the header read 78, because loading a preset replaced
+     the input object wholesale. The solve was using 78 too, so every force on
+     screen was for the wrong occupant while the control insisted otherwise.
+     Exactly the two-renderings-of-one-fact failure M6 fixed in the 3D legend,
+     recreated one milestone later by a different route.
+
+     So every input object entering the loop gets the occupant stamped back on
+     from the control that owns it. One place, both entry points. */
+  function withOccupant(inputs) {
+    if (!inputs) return inputs;
+    if (inputs.bodyMass != null) return inputs;
+    var m = controls ? controls.read().bodyMass : DEFAULT_MASS;
+    var out = {};
+    Object.keys(inputs).forEach(function (k) { out[k] = inputs[k]; });
+    out.bodyMass = m;
+    return out;
+  }
+
   function wake() {
     if (rafId == null) { lastT = 0; rafId = requestAnimationFrame(frame); }
   }
@@ -485,6 +562,7 @@
   /* Snap to a state with no transient — page load, a scrub, a scenario
      change. There is no "previous" for the body to be arriving from. */
   function seek(inputs) {
+    inputs = withOccupant(inputs);
     target = inputs;
     /* The controls are the readout of wherever we just jumped to. Without
        this a scrubbed or freshly loaded scenario draws the right figure over

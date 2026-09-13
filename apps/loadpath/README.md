@@ -3,9 +3,8 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M6 judged; the view ships, the figure does not.** Three views, five live inputs, four
-scripted maneuvers, a separate vibration channel, and the solver running behind them, with 212
-passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M7 built.** Three views, six live inputs, four scripted maneuvers, a separate
+vibration channel, and the solver running behind them, with 227 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -204,6 +203,35 @@ turns, a banner explains what happened, and **both drawings keep showing the cla
 tyres can actually deliver** rather than the state you asked for. Switch the surface to wet and
 the same inputs jump from 67% of the budget to 175%.
 
+## The occupant is a mass, not a person
+
+For six milestones the occupant came as three presets: a 50th percentile male, a 5th percentile
+female, a 95th percentile male. All three multiplied the same segment mass fractions, which come
+from Dempster's 1955 sample of nine male cadavers. Changing the total does not change the
+proportions, so only the mass ever varied and the labels claimed a body the model does not have.
+The plan caught this at M0 and set a condition: fix it before the presets reach a user-facing
+control. They already had — `--driver f05` was in the documented command line the whole time.
+
+M7 tried the better branch first. De Leva (1996) carries both sexes and is the canonical source;
+it is behind hosts this environment cannot reach, and reconstructing its table from memory is the
+mistake M5 already taught once. So the labels went instead. Occupant mass is now a slider from 40
+to 130 kg, the old CLI keys still work but answer with the correction, and **a test scans every
+user-facing string for a percentile or a sex** and fails if one returns.
+
+### What making it an input revealed
+
+The bracing caps in the contact solver are absolute newtons, not fractions of body mass — a
+heavier person does not arrive with proportionally stronger arms. Demand scales exactly with mass;
+the budget to resist it does not scale at all. So every maneuver has a mass where the driver runs
+out of arm and leg and the webbing takes over, and the changeover is sharp: for a 0.45 g stop
+through a bend it sits at **96 kg**, and two kilograms either side of it the shoulder belt goes
+from carrying nothing to carrying several hundred newtons while the footrest and pedal *unload*.
+
+That behaviour has been in the model since M2 and nothing had ever drawn it, because the occupant
+was hard-coded at 78 kg. The panel now reports the threshold for the current maneuver — as a mass,
+never as a verdict about the person. A gentle cruise reports `never`; a 0.9 g stop reports
+`any occupant`.
+
 ## Known limitation in the anthropometry
 
 Building M0 surfaced a contradiction the plan did not have. The occupant presets offer a 5th
@@ -270,6 +298,7 @@ goes — they are absorbing kinematics the model does not have.
 | **M4** | Scripted playback and body lag | **done** — 26 tests |
 | **M5** | Vibration overlay | **done** — 29 tests |
 | **M6** | 3D toggle | **done, split** — 21 tests. View kept, body cut |
+| **M7** | Occupant mass as an input | **done** — 15 tests. Labels retired, threshold surfaced |
 
 M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
 right number rendered plainly, because the polish buys it credibility it hasn't earned.
@@ -348,11 +377,15 @@ direction.
 The headless report takes two options:
 
 ```bash
-node apps/loadpath/js/m0-report.js --surface wet --driver f05
+node apps/loadpath/js/m0-report.js --surface wet --mass 95
 ```
 
-`--surface` is `dry`, `wet` or `snow`. `--driver` is `m50`, `f05` or `m95`. It exits non-zero if
-the Newton's third law audit fails.
+`--surface` is `dry`, `wet` or `snow`. `--mass` is kilograms, 40 to 130. It exits non-zero if the
+Newton's third law audit fails.
+
+`--driver m50|f05|m95` still works and still selects the same three masses, but it prints a notice
+explaining that the old keys named a sex and a percentile the model never had. This CLI is where
+that label actually shipped to a user, which is why M7 started here rather than in the browser.
 
 Abridged output:
 

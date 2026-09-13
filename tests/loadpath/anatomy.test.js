@@ -173,7 +173,7 @@ describe('CROSS-VIEW AGREEMENT: the drawings must not contradict the body', () =
        contact inboard, the picture and the solver would be telling opposite
        stories with no error anywhere. */
     const body = O.solve({
-      bodyMass: C.OCCUPANTS.m50.mass,
+      bodyMass: C.OCCUPANT_MASS.value,
       accel: O.vec(0, 6, 0),                    // +y is left, so a left turn
       gravity: O.gravityForGrade(0)
     });

@@ -2039,3 +2039,203 @@ the decomposition with its measured angles — is not in the plan. The plan said
 build a figure to show a vector. Building it taught me the vector needed showing
 in a way a figure couldn't do. If a prototype only confirms the plan, you
 learned nothing and could have skipped it.
+
+---
+
+# Learning, part nine: M7, and the difference between a caveat and an obligation
+
+## Step 1 — There was no M7, and that is where this starts
+
+You said "build M7." The plan runs M0 to M6 and M6 had just shipped. There was no M7 to build.
+
+The lazy move is to invent one — pick something plausible-sounding, build it, call it a milestone.
+The other lazy move is to stop and ask. I did neither, because the plan already had an answer in
+it, in a section most plans don't have and most people don't re-read: **"Where this breaks."**
+
+That section is a list of things the project knows are wrong with itself. Most of the entries are
+*caveats* — here is a limitation, here is how we mitigate it, carry on. But one was not a caveat.
+It was an **obligation**, with a trigger condition:
+
+> "Before the presets reach a user-facing control, either source sex-specific fractions or relabel
+> the control as a mass slider and stop implying it models a different body."
+
+That is a promise with an if-then. And when I went to check whether the if had fired, it had —
+seven milestones ago. `--driver f05`, labelled "5th percentile female", had been in the documented
+command line since M0.
+
+**The lesson is the distinction.** A caveat says "this is imperfect." An obligation says "this
+becomes unacceptable when X happens." They look identical sitting in a document. Only one of them
+has a tripwire, and nobody had checked whether it had been stepped on.
+
+## Step 2 — Why the label was the bug, not the numbers
+
+This is worth being precise about, because it sounds like pedantry and isn't.
+
+The model computes forces on a body by taking a total mass and splitting it into segments — head,
+trunk, thigh — using fixed fractions. Those fractions come from Dempster, 1955, a sample of nine
+male cadavers. Changing the total mass scales every segment by the same amount. The proportions
+never move.
+
+So a "5th percentile female" preset was a 49 kg person with a man's proportions. Nothing about the
+*arithmetic* was wrong — 49 kg is a fine number and the forces it produces are as right as the
+model gets. What was wrong was the **claim on the label**. It told a reader the simulation could
+model a woman's body, and it can't, and there is no way to tell from the output.
+
+A number with a label is two assertions, and people check the first one.
+
+## Step 3 — I tried the good branch first, and failed honestly
+
+The plan offered two routes: source real sex-specific fractions, or drop the labels. The first is
+strictly better — it would make the app do the thing the label claimed.
+
+De Leva (1996), "Adjustments to Zatsiorsky-Seluyanov's segment inertia parameters," is the
+canonical source and carries both sexes. I went after it: four search passes, six candidate hosts,
+including a direct hit on the actual PDF. Every one blocked by the network proxy — 403 at the
+CONNECT, same wall the ISO vibration tables hit in M5.
+
+Here is the part that matters. **I know roughly what those numbers are.** I could have written
+down a female trunk fraction that would have looked entirely credible and been quietly wrong in
+the third decimal. M5 taught me exactly this lesson at exactly this cost: I "knew" the ISO Wk
+filter had corners at 2.5 and 0.25 Hz, and the real values are 2.37 and 3.35 Hz, and my version
+would have had the wrong shape across the whole low-frequency region.
+
+Recalled precision is not precision. It is a guess wearing a citation.
+
+So: fallback branch, and the failure written into the record rather than papered over.
+
+## Step 4 — The mistake I nearly made, caught by measuring instead of reasoning
+
+Having decided mass was "just a scale factor," I started writing the test that would prove it:
+double the mass, double every contact force. Clean, obvious, and it would have *failed*.
+
+Before writing it I ran a sweep, because it was cheap. And the table came back strange:
+
+```
+ mass   total  N/kg   shoulder belt   footrest
+   78     976  12.51        0            250
+   96    1189  12.51        0            250
+   98    1225  12.51      589             48
+```
+
+Total force per kilogram: constant, dead flat, exactly as expected. The *split*: nothing like it.
+Between 96 and 98 kg the shoulder belt goes from carrying nothing to carrying 589 N, and the
+footrest — which was pinned at its limit — **drops to a fifth of what it was**.
+
+The cause is one line I'd read a dozen times without registering: the bracing caps are absolute
+newtons. `cap: 250`. Not `0.32 × bodyMass`. And that is *correct physics* — a heavier person does
+not come with proportionally stronger arms. A hand on a wheel rim pushes about so hard whoever it
+belongs to.
+
+So demand scales with mass and the budget to resist it doesn't. Every maneuver has a mass where
+the driver runs out of arm and leg and the car's structure takes over. Below it you hold yourself;
+above it the belt holds you.
+
+**That behaviour had been in the model since M2 and nothing had ever seen it**, because the
+occupant was hard-coded at 78 kg for six milestones. A constant input hid a threshold.
+
+I'd have shipped a wrong test on a right-sounding assumption if the sweep hadn't been cheaper than
+the reasoning.
+
+## Step 5 — The bug a screenshot caught that seven tests missed
+
+I wired the slider, ran the suite green, drove the browser, took a screenshot. The slider read
+**110 kg**. The header read **78 kg**.
+
+A scenario timeline carries the channels a driver *operates* — speed, steering, pedals, grade. Not
+occupant mass, deliberately: who is sitting there doesn't change halfway through a lane change.
+But that meant loading a preset replaced the whole input object, `inputs.bodyMass` came back
+undefined, and the solve fell through to the default. Every force on screen belonged to a 78 kg
+occupant while the control insisted on 110.
+
+This is the *same failure* I'd fixed one milestone earlier — in M6 I made the 3D legend and the
+narrow-screen readout come from one return value so they couldn't disagree about a number. Then I
+recreated it one milestone later by a completely different route.
+
+**Knowing a failure mode does not immunise you against it.** It shows up somewhere you weren't
+looking, wearing different clothes.
+
+## Step 6 — The mutation test that lied in the reassuring direction
+
+I mutation-check new tests now — deliberately break the code, confirm the tests scream. Four
+mutations. Three fired. One reported **zero failures**: removing a bracing cap entirely, which
+should have been catastrophic.
+
+My first instinct was that I'd found a hole in the suite. Before writing that down I checked
+whether the mutation had actually applied.
+
+It hadn't. My `sed` pattern didn't match the file's whitespace. It silently changed nothing, the
+tests passed because the code was untouched, and the report said "0 failing" — which I read as
+"your tests are blind." With the edit genuinely applied, **seven tests fail**.
+
+So: I nearly recorded a false weakness, from a broken harness, in the exact tool I use to check
+for false strength.
+
+**A negative result needs the same verification as a positive one.** "Nothing happened" is a
+finding, and findings have to be earned.
+
+## Step 7 — The thing I found and chose not to fix
+
+Sweeping mass at 0.1 kg meant asking the contact solver the same question nine hundred times —
+the first time anything had. About 4% of masses converge to ~1e-6 N where 1e-12 is typical, and
+the worst case is only twice inside the tolerance the plan publishes.
+
+Thirty-nine of the forty match a stall the solver's own comment predicts: two channels pinned at
+their caps, the Hessian loses rank, the active set chatters. One doesn't — at the light end it
+exits after a *single* iteration with nothing saturated, and it's the worst of the sweep. The
+code's stated cause is not the whole story.
+
+I recorded it and left it. Six micronewtons on a load of five hundred is orders of magnitude below
+anything this model can claim to know, and tightening a solver inside its own published tolerance
+is not what M7 was for.
+
+But I wrote the test to assert **two** things: the bound holds everywhere, *and* the coarse cases
+stay rare. A loose bound alone would pass just as happily if the solver degraded across the board.
+
+**A tolerance you widen to make a test pass is a tolerance that now detects nothing.** If you must
+accept a weaker bound, add a second assertion that catches the failure the first one stopped
+catching.
+
+## Step 8 — What an expert notices here
+
+**Constant inputs hide behaviour.** The bracing threshold was computable from day one. Nobody
+could see it because one parameter never moved. When you hard-code something "for now," you are
+not just deferring a feature — you are blinding yourself to everything that depends on it varying.
+Ask what your fixed values are concealing.
+
+**The tripwire nobody watches.** "We'll fix this before X" is the most common unkept promise in
+engineering, not because people are dishonest but because nobody schedules a check for X. If a
+condition makes something unacceptable, something automated has to watch for it. Which is why M7's
+deliverable includes a test that scans user-facing strings for a percentile or a sex — the next
+person to add a friendly-sounding preset will not have read the provenance record.
+
+**A CLI is an interface.** The obligation said "before the presets reach a user-facing control."
+It had been reached for seven milestones, through a command line nobody had counted. Ask what
+surfaces you're not counting: the CLI, the API response, the log line, the error message.
+
+**Guard the claim, not the prose.** My first honesty test flagged three lines of the very comments
+explaining why the labels were retired. A guard that punishes documenting the fix is worse than no
+guard. It strips comments now and scans only what a reader can see — explain the history at any
+length, just don't ship the claim.
+
+## Step 9 — What transfers
+
+**Re-read your own known-issues list looking for if-then, not for regret.** Most entries are
+"this is imperfect." A few are "this becomes wrong when X." Those are different documents sharing
+a page, and only one of them needs a calendar.
+
+**When you can't source it, don't approximate it — relabel it.** Being unable to get the real
+number does not license inventing one. The honest move is to reduce the claim to what you can
+support. A 49 kg mass is true. A "5th percentile female" was not.
+
+**Cheap measurement beats confident reasoning, every time.** I was one keystroke from a wrong test
+built on a right-sounding assumption. The sweep took nine seconds.
+
+**Verify the negative result.** "The test didn't fire" and "the test can't fire" look identical.
+So do "nothing changed" and "my change didn't apply."
+
+**Knowing a failure mode is not protection from it.** I fixed two-sources-of-one-number in M6 and
+recreated it in M7 by a different route. Systems bite where you aren't looking, which is by
+definition not where you just finished looking.
+
+**Fixed parameters are unasked questions.** Every hard-coded constant in your system is a variable
+somebody decided not to think about yet. At least one of them is hiding something interesting.
