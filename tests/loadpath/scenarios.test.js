@@ -246,21 +246,28 @@ describe('the body lag', () => {
     const v = solveVehicle(inputs);
     const want = { x: v.accel.x, y: v.accel.y };
 
-    const l = S.makeLag(0.25);
-    for (let i = 0; i < 2000; i++) l.step(want, 0.016);   // 32 s, well settled
-    const settled = l.value();
-
     const bodyOf = (a) => O.solve({
       bodyMass: C.OCCUPANT_MASS.value,
       accel: O.vec(a.x, a.y, 0),
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
-    const lagged = K.solve(bodyOf(settled).carOnBody);
     const direct = K.solve(bodyOf(want).carOnBody);
 
-    Object.keys(direct.byTouchpoint).forEach((id) => {
-      const d = Math.abs(lagged.byTouchpoint[id].magnitude - direct.byTouchpoint[id].magnitude);
-      assert.ok(d < 1e-6, `${id} differs by ${d} N once settled`);
+    /* BOTH models, and that matters. This test was written at M4 against
+       makeLag(0.25) — the first-order path — and it kept passing untouched
+       when M8 changed the default to a second-order body, because the literal
+       0.25 pins it to the old model forever. The project's most important
+       invariant would have gone on being asserted about code the app no
+       longer runs. Same trap M5 found in its unsprung-mass tests: green, and
+       about nothing. */
+    [['first-order (M4)', S.makeLag(0.25)],
+     ['second-order (M8 default)', S.makeLag()]].forEach(([name, l]) => {
+      for (let i = 0; i < 2000; i++) l.step(want, 0.016);   // 32 s, well settled
+      const lagged = K.solve(bodyOf(l.value()).carOnBody);
+      Object.keys(direct.byTouchpoint).forEach((id) => {
+        const d = Math.abs(lagged.byTouchpoint[id].magnitude - direct.byTouchpoint[id].magnitude);
+        assert.ok(d < 1e-6, `${name}: ${id} differs by ${d} N once settled`);
+      });
     });
   });
 
@@ -300,8 +307,20 @@ describe('provenance keeps up', () => {
     assert.ok(C.PROVENANCE['MODEL.stoppedCar'], 'the stopped-car rule needs a record');
   });
 
-  test('the lag caveat says the thing that is actually wrong with it', () => {
-    // A caveat that does not name the failure mode is decoration.
-    assert.match(C.PROVENANCE['MODEL.bodyLag'].caveat, /overshoot/);
+  test('the body-response caveats say the thing that is actually wrong', () => {
+    /* A caveat that does not name the failure mode is decoration. At M4 this
+       asserted that MODEL.bodyLag admitted it could not overshoot. M8 removed
+       that limitation, so the assertion moves rather than disappears: the new
+       constants must still own what they are, which is unmeasured. */
+    const hz = C.PROVENANCE['MODEL.bodyResponseHz'];
+    const z = C.PROVENANCE['MODEL.bodyDamping'];
+    assert.equal(hz.status, 'placeholder');
+    assert.equal(z.status, 'placeholder');
+    assert.match(hz.caveat, /not measured/i);
+    assert.match(z.caveat, /not measured/i);
+    // The damping constant is the one that buys the rebound, so it has to say so.
+    assert.match(z.caveat, /overshoot/);
+    // And the retired constant must not still be claiming to be the model.
+    assert.match(C.PROVENANCE['MODEL.bodyLag'].caveat, /superseded/i);
   });
 });

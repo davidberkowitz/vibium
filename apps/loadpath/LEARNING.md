@@ -2239,3 +2239,198 @@ definition not where you just finished looking.
 
 **Fixed parameters are unasked questions.** Every hard-coded constant in your system is a variable
 somebody decided not to think about yet. At least one of them is hiding something interesting.
+
+---
+
+# Learning, part ten: M8, and why a placeholder is a debt with interest
+
+## Step 1 — Same move as last time, and that is the point
+
+You said "build M8." There was no M8, same as there was no M7. So I did what worked: went back to
+section 07, the project's own list of what's wrong with itself, and looked for something that was
+an **obligation** rather than a **caveat**.
+
+Two were left. One was a one-line edit to CLAUDE.md. The other was this, written by M4 in the same
+breath as it shipped the feature:
+
+> "Built, and it introduced a failure mode of its own: a first-order lag approaches monotonically
+> and can never overshoot, while a real torso on a compliant seat is second order and rocks past
+> where it settles. The model now gives the delay and none of the rebound, which makes a hard stop
+> look calmer than it feels. Recorded as MODEL.bodyLag, status placeholder."
+
+Read that again, because it is unusual. M4 shipped a feature and, in the same sentence, wrote down
+precisely how it was wrong, why, and what the correct model would be. Then it sat for four
+milestones.
+
+**That is the best kind of technical debt: documented, specific, and diagnosed.** Most debt is
+none of those. It's "TODO: fix this" next to code nobody understands anymore. A note that says
+*what* is wrong, *why* it's wrong, and *what right looks like* is a work order somebody can pick
+up cold. Four milestones later, I picked it up cold.
+
+## Step 2 — Why first-order and second-order isn't jargon
+
+Worth grounding, because the whole milestone is this distinction.
+
+A **first-order lag** is a bucket with a hole. Pour water in, the level rises, fast at first, then
+slower as it closes on the target. It gets there smoothly and it never, ever goes past. One number
+describes it — the time constant, how fast it closes.
+
+A **second-order system** is a mass on a spring. Pull it and let go: it accelerates toward where
+it wants to be, **arrives with speed**, and that momentum carries it straight past. Then the
+spring pulls it back, it overshoots the other way slightly, and it rings down. Two numbers: how
+stiff (frequency) and how much friction (damping).
+
+The difference isn't accuracy. It's *structural*. Overshoot isn't a refinement you tune into a
+first-order lag — it's what having a **second state variable** buys you. The bucket has only a
+level. The mass has a position *and* a velocity, and velocity is what carries it past the target.
+
+Your body is unambiguously the second one. At the end of a hard stop your torso pitches forward
+against the belt and then rocks back — everyone has felt this. M4's model could not represent it
+at all.
+
+## Step 3 — The exactness discipline, inherited
+
+M4 had a rule I kept: don't Euler-integrate, solve the system across the timestep exactly. For the
+lag that meant `1 - e^(-dt/τ)` instead of `dt/τ`.
+
+It matters more for an oscillator, not less. Euler on a lag just loses accuracy. **Euler on an
+oscillator adds energy every step.** The oscillation grows instead of decaying, and it runs away.
+In a browser, a dropped animation frame hands the loop a huge `dt` — and the "body" would get
+flung off to infinity by arithmetic.
+
+The exact form can't do that at any timestep, because the whole solution carries a factor of
+`e^(-ζωt)` that only ever shrinks.
+
+The trick that kept it short is worth stealing: for a constant input, the steady state is exactly
+`(target, 0)`, and the system is linear, so the **deviation** from steady state propagates with no
+input term at all. Track the deviation, add the target back at the end. Three lines instead of
+thirty.
+
+## Step 4 — Measuring the thing I was replacing, which nobody had done
+
+To pick a frequency and damping I needed a target behaviour. The plan says "real occupants respond
+over 0.1 to 0.3 seconds," so I measured candidates against that window.
+
+Then, almost as an afterthought, I measured the **old** model the same way.
+
+```
+M4 first-order τ=0.25 : overshoot=0.0%   90% at 0.58 s
+M8 second-order        : overshoot=20.5%  90% at 0.16 s
+```
+
+The old lag took **0.58 seconds** to reach 90% — roughly twice the slow end of the window the same
+document specifies. It wasn't only unable to overshoot. It was sluggish, and had been for four
+milestones.
+
+Nobody had checked, and I nearly didn't either. τ = 0.25 s *reads* like a quarter-second response.
+It isn't: a first-order lag is at 63% after one time constant and needs about 2.3 of them to reach
+90%. **The number looked right and the behaviour it produced was wrong**, which is the most durable
+kind of error because nothing ever prompts you to look.
+
+## Step 5 — What overshoot broke, which I did not anticipate
+
+The app decided the body had settled like this:
+
+```js
+var settled = err < SETTLE;
+```
+
+Fine forever — while the body could only *approach*. "Near the target" and "finished moving" were
+the same statement.
+
+A second-order body passes **through** the target. At that instant the error is exactly zero and
+the body is travelling at its maximum speed. A position-only test calls that *arrived*: resets the
+state, stops the animation loop, and **swallows the entire rebound** — the one thing the milestone
+exists to show.
+
+I caught this by reasoning about it before writing the code, which I'd like to claim as foresight.
+Honestly it came from asking one question: "what did the old code get to assume that the new code
+breaks?" That question is cheap and it pays constantly.
+
+Settling takes position *and* velocity now.
+
+## Step 6 — The same bug, in words
+
+Then the readout: `0.10 g behind — the occupant is still arriving`.
+
+At 4.2 seconds into a threshold stop the car is stationary and the body is rocking. It is not
+behind. It has arrived and gone past. The value is a magnitude and *cannot* distinguish the two,
+so the sentence beside it was asserting something it had no way to know.
+
+This is precisely the M7 lesson — a label that doesn't come from the data — recurring one
+milestone later in a different disguise. It's now derived from the body's velocity: closing on the
+cabin state, or moving away from it. Same bug as the settle test, expressed in English instead of
+JavaScript.
+
+## Step 7 — The measurement I got wrong, and caught
+
+I wanted scenario-level evidence, so I ran the threshold stop through both models and counted how
+often the body ended up on the opposite side of the cabin. Result:
+
+```
+1st order (M4)   sign flips=1
+2nd order (M8)   sign flips=18
+```
+
+I was about to write that up as "the first-order model crossed once, which it shouldn't be able to
+do." **That would have been wrong**, and wrong in a way that made my own feature look better.
+
+"Cannot overshoot" is a statement about a **step** response: the output never passes the *final
+steady value*. Against a moving target — a scenario ramping brake pressure up and releasing it —
+a first-order lag is always behind, and when the input reverses, "behind" puts it on the other
+side. That's lag, not overshoot.
+
+So the honest reading of that table isn't the existence of a crossing. It's the **ringing**: 18
+versus 1. The second-order body oscillates around the cabin; the first-order one crosses once and
+settles. The structural claim lives in the step response, which is where my tests put it.
+
+Nearly shipping a flattering misreading of my own data is the most uncomfortable thing in this
+milestone and the most worth writing down.
+
+## Step 8 — What an expert notices here
+
+**The test that pinned the old model forever.** M4's gating test — the most important invariant in
+the project, that a settled state is identical with the lag on or off — called `makeLag(0.25)`.
+That literal pins it to the *first-order* path. I changed the default to second order and it kept
+passing, green and cheerful, **about code the app no longer runs**. Same trap M5 found in its
+unsprung-mass tests. It now runs both models explicitly. When you change a default, grep for
+tests that hard-code the old one; they will not fail, which is the problem.
+
+**Check the closed form, not the output.** The overshoot test compares the simulation against
+exp(−πζ/√(1−ζ²)). If I'd run it once and asserted `≈ 0.205`, the test would pass forever and prove
+only that the code still does what it did. Checking against the mathematics tests the
+discretisation.
+
+**Keep the old model reachable.** The `1st order` toggle is three lines of UI and it converts
+"trust me, this is better" into "look." Same principle as M6's decomposition: show the difference,
+don't assert it.
+
+**A placeholder is a debt with interest.** The rebound was missing for four milestones. Every
+screenshot, every demo, every intuition anyone formed from this app in that window was of a car
+that felt calmer than a real one. The note in the drawer was honest, but nobody reads the drawer.
+
+## Step 9 — What transfers
+
+**Write the defect down when you ship the compromise, not later.** M4 shipped something wrong and
+described exactly how, in place, in one sentence. That's what made it fixable by someone who'd
+forgotten everything — including me. Most TODOs say "fix this." Say *what's wrong, why, and what
+right looks like*, and you've written a work order instead of a regret.
+
+**Measure the thing you're replacing.** I'd have picked reasonable parameters anyway. Measuring the
+old one turned up a second defect nobody knew about. The baseline is free data and almost nobody
+collects it.
+
+**Ask what the old code was allowed to assume.** Every change silently invalidates guarantees the
+surrounding code was quietly relying on. "Position alone means settled" was true, then wasn't, and
+nothing would have announced it. That one question found the bug before it existed.
+
+**A number that looks right is not a behaviour that is right.** τ = 0.25 s reads like a
+quarter-second response and delivers 0.58 s to 90%. Parameters describe systems; check the system.
+
+**Beware the misreading that flatters you.** My sign-flip metric made my new feature look
+structurally superior on a comparison that didn't support the claim. Conclusions that favour your
+own work deserve the *most* scrutiny, not the least — they're the ones you won't want to re-check.
+
+**Structural limits don't respond to tuning.** No time constant makes a first-order lag overshoot.
+When something can't do what you need, no parameter will save you — you need the extra state
+variable. Recognising "this is structural, not a tuning problem" early saves whole days.
