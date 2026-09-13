@@ -545,6 +545,18 @@ button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--re
 .sc-leader { stroke: var(--line-strong); stroke-width: 1; opacity: .55; }
 .sc-axis-note { font-size: 9.5px; fill: var(--line-strong); }
 
+/* M8. The body-response model switch. Deliberately small and beside the lag
+   checkbox: it is a comparison control, not a headline setting. */
+.tp-order { display: inline-flex; gap: 0; margin-left: 10px; }
+.tp-order-btn {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg-dim);
+  padding: 2px 8px; font-size: 10.5px; cursor: pointer; font-family: inherit;
+}
+.tp-order-btn:first-child { border-radius: 3px 0 0 3px; }
+.tp-order-btn:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+.tp-order-btn:hover { color: var(--fg); }
+.tp-order-btn.on { background: var(--line-strong); color: var(--fg); font-weight: 600; }
+
 /* The scene's legend lives in SVG units, so it shrinks with the drawing: at
    390px wide the 880-unit viewBox scales by 0.44 and 10.5px type renders at
    under 5px. Below 760px the in-scene legend is dropped and the same three

@@ -3,8 +3,9 @@
 A browser simulation of every force a car and its driver push through each other, at each of
 the twelve places where they touch.
 
-**Status: M7 built.** Three views, six live inputs, four scripted maneuvers, a separate
-vibration channel, and the solver running behind them, with 227 passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
+**Status: M8 built.** Three views, six live inputs, four scripted maneuvers, a separate
+vibration channel, a second-order body response, and the solver running behind them, with 242
+passing tests. The full build plan is in [`PLAN.html`](PLAN.html) — open it in a browser. It carries the physics, the touchpoint
 register, the architecture, the milestones, the failure modes, and the source provenance for
 every default value.
 
@@ -83,6 +84,39 @@ somewhere else.
 Everything downstream comes from one solve. The panel does not re-derive the g-load and the gauge
 does not re-derive the friction utilisation. Two places computing the same number is two places to
 disagree.
+
+## The body arrives, and then keeps going
+
+M4 gave the occupant a first-order lag so the model would stop snapping instantly, and recorded
+the defect in the same breath: **a first-order system cannot overshoot.** A real torso on a
+compliant seat is a mass on a spring — it arrives and rocks past before settling. The model gave
+you the delay and none of the rebound, which makes a hard stop look calmer than it feels. That sat
+as a placeholder for four milestones.
+
+M8 makes it second order: 2.0 Hz, damping 0.45, a **20.5% peak rebound**. The number isn't typed
+in — a test checks the simulation against exp(−πζ/√(1−ζ²)). It's discretised exactly rather than
+integrated, the same property the first-order `alpha()` had, because Euler on an oscillator injects
+energy and a dropped animation frame would fling the body off to infinity.
+
+The clearest place to see it: play **Threshold brake to a stop** and watch past the four-second
+mark. The car is stationary, and the occupant is still rocking. The `1st order` button runs the old
+response beside it.
+
+### A second defect, found by measuring
+
+Setting the new parameters meant measuring the step response of the thing being replaced, which
+nobody had done. The M4 lag reached 90% in **0.58 s** — about twice the slow end of the 0.1–0.3 s
+window this project documents for occupant response. It wasn't only unable to overshoot; it was
+sluggish. A plausible-looking time constant never gets checked against the behaviour it produces.
+
+### What overshoot broke
+
+The app decided the body had settled from position alone. That was safe while the body could only
+approach — "near the target" and "finished moving" were the same statement. A second-order body
+passes *through* the target at maximum speed, so a position-only test calls that arrived, resets
+the state and stops the frame loop, swallowing the rebound entirely. Settling takes position and
+velocity now. The `body vs cabin` note had the same bug in words: "still arriving" is false of an
+occupant who has arrived and gone past, so it's derived from the body's velocity instead.
 
 ## Time, and the body arriving late
 
@@ -299,6 +333,7 @@ goes — they are absorbing kinematics the model does not have.
 | **M5** | Vibration overlay | **done** — 29 tests |
 | **M6** | 3D toggle | **done, split** — 21 tests. View kept, body cut |
 | **M7** | Occupant mass as an input | **done** — 15 tests. Labels retired, threshold surfaced |
+| **M8** | Second-order body response | **done** — 15 tests. The rebound the model never had |
 
 M0 deliberately had no interface. A wrong number rendered beautifully is more dangerous than a
 right number rendered plainly, because the polish buys it credibility it hasn't earned.

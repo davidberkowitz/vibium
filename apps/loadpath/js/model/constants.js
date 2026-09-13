@@ -228,17 +228,39 @@
               'to a known answer rather than measured — they are absorbing the ' +
               'kinematics the point-mass model throws away.'
     },
+    'MODEL.bodyResponseHz': {
+      value: 2.0, unit: 'Hz', status: 'placeholder',
+      source: 'Natural frequency of the occupant\'s acceleration following ' +
+              'the cabin\'s, modelled as one second-order mode. Stands for the ' +
+              'whole compliant chain — suspension travel, seat foam, soft ' +
+              'tissue and postural response.',
+      caveat: 'Not measured. Chosen so the step response lands inside the ' +
+              '0.1 to 0.3 second window this project documents for occupant ' +
+              'response: it reaches 90% in 0.16 s and peaks at 0.28 s. The ' +
+              'first-order lag it replaced took 0.58 s to reach 90%, which was ' +
+              'outside that window in the slow direction and nobody had ' +
+              'measured it.'
+    },
+    'MODEL.bodyDamping': {
+      value: 0.45, unit: 'ratio', status: 'placeholder',
+      source: 'Damping ratio of the same mode. Under 1, so the body overshoots ' +
+              'and settles back rather than creeping up to the answer.',
+      caveat: 'Not measured. It sets the rebound: 0.45 gives a 20.5% peak ' +
+              'overshoot, exp(-pi*z/sqrt(1-z^2)), which a test checks the ' +
+              'simulation against rather than against a typed number. The M4 ' +
+              'model had NO rebound at all and could not have any — a ' +
+              'first-order lag is structurally incapable of overshooting. ' +
+              'This still changes only the TRANSIENT; every settled state is ' +
+              'identical with the lag on or off, and a test asserts it.'
+    },
     'MODEL.bodyLag': {
       value: 0.25, unit: 's', status: 'placeholder',
-      source: 'First-order time constant for the occupant\'s acceleration ' +
-              'following the cabin\'s. Stands for the whole compliant chain — ' +
-              'suspension travel, seat foam, soft tissue and postural response.',
-      caveat: 'Not measured, and structurally wrong in one specific way: a ' +
-              'first-order lag can never overshoot, while a real torso on a ' +
-              'compliant seat is second-order and does. You get the delay and ' +
-              'none of the rebound, so a hard stop looks calmer than it feels. ' +
-              'It changes only the TRANSIENT; every settled state is identical ' +
-              'with the lag on or off.'
+      source: 'The M4 first-order time constant, retained because the ' +
+              'first-order model is retained: the transport can still run it, ' +
+              'which is what makes the second-order difference demonstrable ' +
+              'rather than merely asserted.',
+      caveat: 'Superseded as the default at M8. Kept as a comparison, not as ' +
+              'a claim about a body.'
     },
     'MODEL.stoppedCar': {
       status: 'design',

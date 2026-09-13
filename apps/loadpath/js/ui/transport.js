@@ -30,6 +30,7 @@
   var head = 0;            // seconds into the scenario
   var playing = false;
   var lagOn = true;
+  var lagOrder = 'second';
   var nodes = {};
   var handlers = {};
 
@@ -168,10 +169,45 @@
     });
     lagWrap.appendChild(cb);
     lagWrap.appendChild(dom('span', null, 'Body lag'));
-    lagWrap.appendChild(dom('span', 'tp-tau', 'τ ' + S.TAU.toFixed(2) + ' s'));
-    lagWrap.title = 'The occupant follows the cabin through a first-order lag. ' +
+    var tauOut = dom('span', 'tp-tau', '');
+    lagWrap.appendChild(tauOut);
+    lagWrap.title = 'The occupant follows the cabin through a second-order ' +
+                    'response, so the body overshoots and settles back. ' +
                     'Transient only — settled states are identical either way.';
     bar.appendChild(lagWrap);
+
+    /* M8. The first-order model stays reachable on purpose. The milestone's
+       claim is that a body rocks past where it settles and the old model
+       structurally could not show that; a toggle lets you see both instead of
+       taking the claim on trust. */
+    var orderWrap = dom('div', 'tp-order');
+    orderWrap.setAttribute('role', 'radiogroup');
+    orderWrap.setAttribute('aria-label', 'Body response model');
+    [['second', '2nd order', '2.0 Hz · ζ 0.45'],
+     ['first', '1st order', 'τ ' + S.TAU.toFixed(2) + ' s']].forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tp-order-btn' + (o[0] === lagOrder ? ' on' : '');
+      b.textContent = o[1];
+      b.title = o[0] === 'second'
+        ? 'Mass on a spring: overshoots and settles back. M8.'
+        : 'The M4 lag. Cannot overshoot, and reaches 90% in 0.58 s.';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', o[0] === lagOrder ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        lagOrder = o[0];
+        [].forEach.call(orderWrap.children, function (c) {
+          c.classList.remove('on'); c.setAttribute('aria-checked', 'false');
+        });
+        b.classList.add('on'); b.setAttribute('aria-checked', 'true');
+        tauOut.textContent = o[2];
+        if (handlers.onLagModelChange) handlers.onLagModelChange(lagOrder);
+      });
+      orderWrap.appendChild(b);
+    });
+    tauOut.textContent = lagOrder === 'second' ? '2.0 Hz · ζ 0.45'
+                                               : 'τ ' + S.TAU.toFixed(2) + ' s';
+    bar.appendChild(orderWrap);
 
     var blurb = dom('p', 'tp-blurb');
     blurb.hidden = true;

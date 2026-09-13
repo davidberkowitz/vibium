@@ -10,7 +10,7 @@
 <body>
   <header id="toolbar">
     <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
-    <span class="milestone">M6 · 3D gate</span>
+    <span class="milestone">M8 · second-order body</span>
     <div class="spacer"></div>
     <span id="readout" class="readout"></span>
     <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
@@ -77,12 +77,20 @@
         deliver, and say so rather than extrapolating.
       </p>
       <p class="caption">
-        With <strong>body lag</strong> on, the occupant follows the cabin
-        through a first-order delay, so mid-maneuver the two drawings
-        deliberately disagree: the tyre loads in plan have already moved while
-        the body in elevation is still arriving. That gap is the readout marked
-        <em>body vs cabin</em>. It closes to nothing whenever the inputs hold
-        still, so every settled number is the same with the lag on or off.
+        With <strong>body lag</strong> on, the occupant follows the cabin as a
+        <strong>mass on a spring</strong> — 2.0&nbsp;Hz, damping 0.45 — so
+        mid-maneuver the two drawings deliberately disagree: the tyre loads in
+        plan have already moved while the body in elevation is still arriving.
+        Then it arrives and keeps going. At the end of a hard stop the car is
+        stationary and the occupant is still rocking, which is the part you
+        actually feel and the part the model could not show until M8. The
+        <em>1st order</em> button runs the older response for comparison: it
+        reaches 90% in 0.58&nbsp;s instead of 0.16&nbsp;s and, being
+        first-order, cannot overshoot at all. The gap is the readout marked
+        <em>body vs cabin</em>, and it says whether the occupant is still
+        arriving or has gone past. It closes to nothing whenever the inputs
+        hold still, so every settled number is the same with the lag on or
+        off, either model — asserted by a test against both.
       </p>
       <section id="vib-block">
         <h2 class="fig-title">Vibration <span>a different quantity, in different units</span></h2>

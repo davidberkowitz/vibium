@@ -68,7 +68,10 @@
   var cur = { inputs: null, vehicle: null, occupant: null, split: null, lagErr: 0 };
 
   /* M4 playback state. One clock, one rAF loop, one lag tracker — see frame(). */
-  var lag = S.makeLag(S.TAU);
+  /* M8. Second order by default. The transport can swap in the M4 first-order
+     lag, which is what makes the difference something you can watch rather
+     than something the caption claims. */
+  var lag = S.makeLag();
   var target = null;          // the inputs we are heading toward
   var rafId = null;
   var lastT = 0;
@@ -156,6 +159,24 @@
       : 0;
     var r = v.turnRadius;
 
+    /* M8. "Behind" and "still arriving" were true of a first-order body,
+       which only ever approaches. A second-order body arrives and keeps going,
+       and at the end of a hard stop the car is stationary while the occupant
+       is still rocking — calling that "behind" describes the opposite of what
+       is happening. The value is a magnitude and cannot tell the two apart, so
+       the note is derived from the body's VELOCITY: closing on the cabin state
+       or moving away from it. Another label that was not coming from the data. */
+    function lagPhase() {
+      var v = lag.velocity ? lag.velocity() : null;
+      if (!v) return 'the occupant is still arriving';
+      var want = cur.vehicle.accel, at = lag.value();
+      var dx = want.x - at.x, dy = want.y - at.y;
+      var closing = dx * v.x + dy * v.y;      // >0 means moving toward the cabin
+      if (closing > 0.01) return 'the occupant is still arriving';
+      if (closing < -0.01) return 'the occupant has gone past and is rocking back';
+      return 'the occupant is turning around';
+    }
+
     /* M7. Two readouts that only became sayable once mass was an input.
 
        The belts row has always reported slack or engaged. What it could never
@@ -187,8 +208,8 @@
       ['Longitudinal', (v.accel.x / C.G).toFixed(2) + ' g', v.accel.x < -0.01 ? 'braking' : (v.accel.x > 0.01 ? 'accelerating' : 'steady')],
       ['Lateral', (v.accel.y / C.G).toFixed(2) + ' g', v.accel.y > 0.01 ? 'turning left' : (v.accel.y < -0.01 ? 'turning right' : 'straight')],
       ['Turn radius', r === Infinity ? '—' : r.toFixed(0) + ' m', 'from speed and steering'],
-      ['Body vs cabin', cur.lagErr > 0 ? (cur.lagErr / C.G).toFixed(2) + ' g behind' : 'settled',
-       cur.lagErr > 0 ? 'the occupant is still arriving' : 'body and cabin agree'],
+      ['Body vs cabin', cur.lagErr > 0 ? (cur.lagErr / C.G).toFixed(2) + ' g apart' : 'settled',
+       cur.lagErr > 0 ? lagPhase() : 'body and cabin agree'],
       ['Traction used', (v.utilisation * 100).toFixed(0) + ' %', v.tractionExceeded ? 'DEMAND EXCEEDS GRIP' : 'within the friction ellipse'],
       ['Car → driver', n1(O.magnitude(s.carOnBody)) + ' N', 'total across all contacts'],
       ['Contacts carrying load', loaded + ' of 12', 'the rest are idle or slack'],
@@ -516,7 +537,16 @@
     else lag.reset(want);
 
     var err = lag.error(want);
-    var settled = err < SETTLE;
+    /* M8. Settling takes both position AND velocity now, and that is not
+       tidiness — it is a bug the second-order body would otherwise have.
+
+       A first-order lag only ever approaches, so "close to the target" and
+       "finished moving" were the same statement and position alone was enough.
+       A second-order body overshoots: on the way past it sits EXACTLY on the
+       target while travelling at its maximum speed. A position-only test calls
+       that arrived, resets the state, kills the rAF loop — and the rebound
+       this whole milestone exists to show never gets drawn. */
+    var settled = lag.settled(want, SETTLE);
     if (settled) lag.reset(want);
     draw(target, lag.value(), settled ? 0 : err);
 
@@ -589,7 +619,16 @@
     transport = Transport.mount(document.getElementById('transport'), {
       onSeek: function (inputs) { seek(inputs); },
       onModeChange: function () { wake(); },
-      onLagChange: function () { wake(); }
+      onLagChange: function () { wake(); },
+      onLagModelChange: function (order) {
+        /* Rebuild rather than mutate, and carry the CURRENT body state across
+           so flipping models mid-transient compares the two from the same
+           instant instead of restarting the maneuver. */
+        var at = lag.value();
+        lag = order === 'first' ? S.makeLag(S.TAU) : S.makeLag();
+        lag.reset(at);
+        wake();
+      }
     });
     mountViewSwitch();
     mountOrbit();
