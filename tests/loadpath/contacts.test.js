@@ -19,7 +19,7 @@ require('../../apps/loadpath/js/model/contacts.js');
 const { LoadPathConstants: C, LoadPathOccupant: O,
         LoadPathContacts: K, LoadPathTouchpoints: T } = globalThis;
 
-const DRIVER = C.OCCUPANTS.m50.mass;
+const DRIVER = C.OCCUPANT_MASS.value;
 const G = C.G;
 const BAL = 1e-4;          // newtons; observed worst across the envelope is ~7e-6
 

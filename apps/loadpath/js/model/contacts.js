@@ -350,7 +350,46 @@
     };
   }
 
+  /* ---------------------------------------------------------------------
+     THE BRACING THRESHOLD — M7.
+
+     The caps above are ABSOLUTE newtons, not fractions of body mass, and that
+     is deliberate: a heavier person does not come with proportionally stronger
+     arms. A hand on a wheel rim can push about so hard whoever it belongs to.
+
+     The consequence went undrawn for seven milestones because body mass was
+     hard-coded. Demand scales exactly with mass — twice the body, twice the
+     newtons — but the BUDGET to brace against it does not scale at all. So for
+     any given maneuver there is a mass at which the braced channels saturate,
+     the driver runs out of arm and leg, and the webbing takes up. Below it a
+     driver holds themselves; above it the car holds them. Same maneuver, same
+     car, different answer, and the changeover is sharp.
+
+     This finds that mass by bisection on the solver's own slackEngaged flag.
+     It is a property of the maneuver, not of the occupant: the occupant is the
+     thing being compared against it.
+
+     Returns null when the whole range is on one side — a gentle cruise never
+     engages the belts at any mass, and there is no threshold to report rather
+     than a made-up one at the end of the range. */
+  function bracingThreshold(opts) {
+    var lo = opts.min, hi = opts.max;
+    var engagedAt = function (m) {
+      return solve(opts.requiredForMass(m)).slackEngaged === true;
+    };
+    if (engagedAt(lo)) return { mass: lo, atFloor: true };
+    if (!engagedAt(hi)) return null;
+    /* 24 halvings takes a 90 kg span below a gram; 40 is the cheap safety
+       margin on a solve that costs microseconds. */
+    for (var i = 0; i < 40 && hi - lo > 1e-4; i++) {
+      var mid = (lo + hi) / 2;
+      if (engagedAt(mid)) hi = mid; else lo = mid;
+    }
+    return { mass: hi, atFloor: false };
+  }
+
   global.LoadPathContacts = {
-    CHANNELS: CHANNELS, solve: solve, auditBalance: auditBalance, solveSet: solveSet
+    CHANNELS: CHANNELS, solve: solve, auditBalance: auditBalance, solveSet: solveSet,
+    bracingThreshold: bracingThreshold
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
