@@ -1,0 +1,499 @@
+<title>Fifteen Merges, Zero Readers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F7F8F7; --panel:#EDF0F0; --sunk:#E3E8E8;
+    --ink:#15191B; --ink2:#414A4E; --muted:#6B7679; --rule:#D2D8D8;
+    --build:#0E7F9E; --merge:#C2711C; --zero:#A6303C;
+    --serif:"Spectral",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+    --meas:34rem;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#12171A; --panel:#1A2126; --sunk:#151C20;
+      --ink:#E6EBEA; --ink2:#BAC4C5; --muted:#889497; --rule:#2B3439;
+      --build:#2C8FB8; --merge:#B87A28; --zero:#D2717C;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12171A; --panel:#1A2126; --sunk:#151C20;
+    --ink:#E6EBEA; --ink2:#BAC4C5; --muted:#889497; --rule:#2B3439;
+    --build:#2C8FB8; --merge:#B87A28; --zero:#D2717C;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg); color:var(--ink); font-family:var(--serif); font-size:17px; line-height:1.62;
+       padding-block:0 4rem; padding-left:20px; padding-right:20px; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:62rem; margin:0 auto}
+  .col{max-width:var(--meas)}
+  p{margin:0 0 1.05em}
+  a{color:var(--build)}
+  h1,h2,h3{text-wrap:balance; margin:0}
+  h1{font-size:clamp(2.1rem,6vw,3.2rem); font-weight:600; line-height:1.08; letter-spacing:-.015em}
+  h2{font-size:1.5rem; font-weight:600; line-height:1.2; margin:0 0 .55em}
+  h3{font-size:1.05rem; font-weight:600; margin:0 0 .35em}
+  .eyebrow{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.13em;
+           text-transform:uppercase; color:var(--muted)}
+  .lede{font-size:1.18rem; color:var(--ink2); line-height:1.5}
+  header.masthead{border-bottom:2px solid var(--ink); padding-block:2.6rem 1.1rem; margin-bottom:1.6rem}
+  .masthead .row{display:flex; flex-wrap:wrap; gap:.6rem 1.4rem; align-items:baseline; margin-top:1rem}
+  section{padding-block:2.2rem; border-top:1px solid var(--rule)}
+  section:first-of-type{border-top:0}
+  .sect-head{display:flex; gap:1rem; align-items:baseline; margin-bottom:1rem; flex-wrap:wrap}
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+         background:var(--rule); border:1px solid var(--rule); margin:1.4rem 0}
+  .tile{background:var(--panel); padding:1rem 1.05rem}
+  .tile .n{font-family:var(--mono); font-size:2rem; font-weight:600; letter-spacing:-.02em;
+           font-variant-numeric:tabular-nums; line-height:1.05; display:block}
+  .tile .k{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--muted); display:block; margin-top:.45rem}
+  .tile .was{font-size:.85rem; color:var(--ink2); display:block; margin-top:.3rem}
+  .tile.flag{background:var(--sunk); box-shadow:inset 3px 0 0 var(--zero)}
+  .tile.flag .n{color:var(--zero)}
+  figure{margin:1.6rem 0}
+  figure img{width:100%; max-width:100%; height:auto; display:block; border:1px solid var(--rule)}
+  figcaption{font-family:var(--mono); font-size:.7rem; color:var(--muted); margin-top:.5rem; letter-spacing:.04em}
+  details{margin:.2rem 0 1.4rem; font-family:var(--mono); font-size:.78rem}
+  details summary{cursor:pointer; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:.68rem}
+  .prompt-block{white-space:pre-wrap; background:var(--sunk); border:1px solid var(--rule); padding:.85rem;
+                margin-top:.6rem; line-height:1.5; overflow-x:auto; color:var(--ink2)}
+  .chart{background:var(--panel); border:1px solid var(--rule); padding:1.1rem 1.1rem .8rem; margin:1.4rem 0}
+  .chart-title{font-family:var(--mono); font-size:.78rem; font-weight:600; letter-spacing:.04em; margin-bottom:.15rem}
+  .chart-sub{font-family:var(--mono); font-size:.7rem; color:var(--muted); margin-bottom:.9rem}
+  .chart svg{width:100%; height:auto; display:block; overflow:visible}
+  .legend{display:flex; gap:1.2rem; font-family:var(--mono); font-size:.72rem; color:var(--ink2); margin-bottom:.7rem}
+  .legend i{width:11px; height:11px; display:inline-block; margin-right:.4rem; vertical-align:-1px}
+  .bar:hover{opacity:.72}
+  .zeros{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin:1.3rem 0}
+  .zero-item{border-left:3px solid var(--zero); padding:.1rem 0 .1rem .85rem}
+  .zero-item h3{font-family:var(--mono); font-size:.8rem; letter-spacing:.04em; color:var(--zero)}
+  .zero-item p{font-size:.94rem; color:var(--ink2); margin:0}
+  .contradiction{border-top:1px solid var(--rule); padding-top:.9rem; margin-top:.9rem}
+  .contradiction .said{font-style:italic; color:var(--ink2)}
+  .contradiction .logged{font-family:var(--mono); font-size:.82rem; color:var(--ink)}
+  .two{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.6rem; margin-top:1rem}
+  ul.tight{margin:0; padding-left:1.1rem}
+  ul.tight li{margin-bottom:.5rem; color:var(--ink2)}
+  ul.tight li b{color:var(--ink); font-weight:600}
+  .scen{border-top:1px solid var(--rule); padding:1rem 0}
+  .scen-head{display:flex; align-items:baseline; gap:.8rem; flex-wrap:wrap}
+  .scen-head h3{flex:1 1 auto; min-width:12rem}
+  .pct{font-family:var(--mono); font-weight:600; font-size:1.15rem; font-variant-numeric:tabular-nums}
+  .meter{height:6px; background:var(--sunk); margin:.5rem 0 .7rem; border:1px solid var(--rule)}
+  .meter span{display:block; height:100%; background:var(--build)}
+  .ind{font-family:var(--mono); font-size:.76rem; color:var(--muted)}
+  table{border-collapse:collapse; width:100%; font-size:.9rem; margin:1.1rem 0}
+  th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--rule); vertical-align:top}
+  th{font-family:var(--mono); font-size:.68rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:500}
+  td.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .table-scroll{overflow-x:auto}
+  code,kbd{font-family:var(--mono); font-size:.86em; background:var(--sunk); padding:.1em .32em; border:1px solid var(--rule)}
+  pre{font-family:var(--mono); font-size:.8rem; background:var(--sunk); border:1px solid var(--rule);
+      padding:.9rem; overflow-x:auto; line-height:1.5; margin:.6rem 0 1.4rem}
+  .actions{counter-reset:act; margin-top:1rem}
+  .act{display:flex; gap:.9rem; padding:.85rem 0; border-top:1px solid var(--rule)}
+  .act .tag{font-family:var(--mono); font-size:.66rem; letter-spacing:.08em; padding:.15rem .4rem;
+            border:1px solid var(--rule); height:fit-content; color:var(--muted); white-space:nowrap}
+  .act .tag.p0{color:var(--zero); border-color:var(--zero)}
+  .act p{margin:.25rem 0 0; font-size:.95rem; color:var(--ink2)}
+  footer{border-top:2px solid var(--ink); margin-top:2.6rem; padding-top:1.1rem;
+         font-family:var(--mono); font-size:.74rem; color:var(--muted); line-height:1.7}
+  @media (prefers-reduced-motion:no-preference){.bar{transition:opacity .15s ease}}
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <div class="eyebrow">Behavioral record · davidberkowitz/vibium · second pass</div>
+  <h1>Fifteen Merges,<br>Zero Readers</h1>
+  <div class="row">
+    <span class="eyebrow">Compiled 2026-09-13</span>
+    <span class="eyebrow">217 days · 45 commits · 17 pull requests</span>
+    <span class="eyebrow">Source: git history only</span>
+  </div>
+</header>
+
+<section>
+  <div class="col">
+    <p class="lede">Two months ago a mirror built from this repository said one thing: the work
+    gets finished and never leaves the branch. Every number in that sentence has since moved —
+    except the one the sentence was about.</p>
+    <p>What follows was compiled by a script, not by recollection. <code>reflections/track.sh</code>
+    reads the fork's git history and emits the hard numbers; the prose is the only part written
+    by hand. Where a number and a memory disagree here, the number wins — which is the rule this
+    record was built on in the first place.</p>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><span class="n">15</span><span class="k">merged pull requests</span><span class="was">was 0 on 2026-07-16</span></div>
+    <div class="tile"><span class="n">5.4<small style="font-size:1rem"> h</small></span><span class="k">median merge latency</span><span class="was">was 17–31 days</span></div>
+    <div class="tile"><span class="n">12,129</span><span class="k">lines in four days</span><span class="was">one session, 82 wall hours</span></div>
+    <div class="tile flag"><span class="n">0</span><span class="k">people who opened it</span><span class="was">unchanged since day one</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">01 · what changed</span></div>
+  <div class="col">
+    <h2>The fix was a rule, not a resolution</h2>
+    <p>On 2026-07-21, six days after reading the mirror, he spent five minutes and three commits:
+    merged the stranded vault branch — the first merge in the fork's history — wrote session rules
+    into <code>CLAUDE.md</code>, and added <code>/ship</code>, <code>/triage</code>,
+    <code>/tryit</code>.</p>
+    <p>Read the order carefully. He did not resolve to try harder. He changed the machine so the
+    step could not be skipped, then let the machine carry it: <i>"the agent owns ALL git
+    mechanics," "last ten minutes: ship or archive, there is no third option."</i> Seven months of
+    stalling ended in under a week, which tells you the stall was never willpower. It was an
+    unspecified step in a system that was otherwise fully specified.</p>
+  </div>
+
+  <div class="chart">
+    <div class="chart-title">Every active day since the fork</div>
+    <div class="chart-sub">Bar height = commits that day · 217-day span · 15 active days · duty cycle 6.9%</div>
+    <svg viewBox="0 0 900 190" role="img" aria-label="Timeline of commits per active day from February to September 2026, showing isolated single days until a five-day cluster in September.">
+      <line x1="20" y1="150" x2="880" y2="150" stroke="var(--rule)" stroke-width="1"/>
+      <g id="cadence"></g>
+      <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)">
+        <text x="20" y="168">Feb 8</text><text x="300" y="168">Jun 27</text>
+        <text x="415" y="168">Jul 21</text><text x="600" y="168">Aug 17</text><text x="820" y="168">Sep 13</text>
+      </g>
+      <g id="annot"></g>
+    </svg>
+  </div>
+
+  <div class="col">
+    <p>The unit of work inverted too. In February a whole project landed as one 1,355-line commit
+    and sat unmerged for 195 days. In September the Driver Load Path arrived as a plan, then M0
+    through M8 — nine pull requests, each 700 to 1,700 lines, each merged before the next opened.
+    He did not learn to ship by lowering his standard for finished. He learned to cut work into
+    pieces that each deserve a merge.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">02 · the clock</span></div>
+  <div class="col">
+    <h2>Write hot, merge cold</h2>
+    <p>The strongest new pattern in the record is a sleep. Building clusters in the evening; merging
+    clusters the next morning. Those five- to ten-hour latencies are not hesitation — they are a
+    night. It is a review gate he never wrote down, and it is better than most teams' review
+    process.</p>
+  </div>
+
+  <figure>
+    <img src="images/01-two-clocks.png" alt="Nano Banana render: a night drafting table with a strip of graph paper carrying two clusters of hand-inked bars, cyan at the evening end and amber at the morning end." loading="lazy">
+    <figcaption>Nano Banana Pro (gemini-3-pro-image-preview) · prompt below</figcaption>
+  </figure>
+  <details class="nb-prompt"><summary>NB / Nano Banana prompt</summary>
+  <div class="prompt-block">A night-time drafting table seen from a slightly elevated three-quarter angle, where a long strip of graph paper unrolls across the wood carrying two distinct peaks of hand-inked bars — one cluster drawn in deep cyan ink at the evening end, one cluster in amber ink at the morning end — while a brass stamp, an ink pot and a closed pocket watch rest beside the strip and a single low desk lamp throws warm light from the left. Rendered as a precise technical still life in the style of mid-century engineering illustration, with fine ink hatching, visible paper tooth and no digital gloss, lit by one warm tungsten source that leaves the far edge of the table in cool shadow. The composition features a wide horizontal framing with the paper strip running edge to edge and the lamp glow falling across the amber cluster. Color palette emphasizes deep cyan, oxidised amber, graphite grey and warm paper cream. The mood is quiet, disciplined, late and unhurried.</div>
+  </details>
+
+  <div class="chart">
+    <div class="chart-title">When he builds, and when he merges</div>
+    <div class="chart-sub">Commits by hour, America/Los_Angeles · 30 work commits, 15 merges, all 2026 activity</div>
+    <div class="legend">
+      <span><i style="background:var(--build)"></i>building</span>
+      <span><i style="background:var(--merge)"></i>merging</span>
+    </div>
+    <svg viewBox="0 0 900 230" role="img" aria-label="Grouped bar chart of commits by hour of day. Building peaks at 17:00 and again from 20:00 to 23:00. Merging peaks between 06:00 and 10:00 and again mid-afternoon.">
+      <g id="clock-grid"></g>
+      <g id="clock"></g>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">03 · the collapse</span></div>
+  <div class="col">
+    <h2>From a month to an afternoon</h2>
+    <p>Thirteen pieces of work have been merged to main. The two that predate the session rules
+    waited seventeen and thirty-one days. The eleven that came after waited a median of five hours,
+    and two of them under three minutes.</p>
+  </div>
+  <div class="chart">
+    <div class="chart-title">Time from "committed" to "on main"</div>
+    <div class="chart-sub">Log scale · each dot is one merged piece of work</div>
+    <svg viewBox="0 0 900 150" role="img" aria-label="Dot strip on a log scale showing merge latency: two points at 17 and 31 days before the session rules, eleven points between two minutes and ten hours after.">
+      <g id="lat"></g>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">04 · what did not change</span></div>
+  <div class="col">
+    <h2>Four zeros, and they are the same zero</h2>
+    <p>Seventeen pull requests, all opened by him, all merged by him, and not one review comment
+    from another human anywhere in the record. The gate the July mirror named — <i>"for me only,
+    until they provide value to others"</i> — did not open. It moved. A cheaper, testable gate
+    (merge to main) got installed and now fires eleven times a week, and merging to a repository
+    only you read is not exposure. It is filing.</p>
+  </div>
+  <div class="zeros">
+    <div class="zero-item"><h3>0 readers</h3><p>No one outside this account has opened anything built here. 17 PRs, 0 comments, 0 collaborators.</p></div>
+    <div class="zero-item"><h3>0 CI runs</h3><p>267 tests exist. <code>.github/</code> does not. They run only when someone remembers.</p></div>
+    <div class="zero-item"><h3>0 URLs</h3><p>Three finished apps, all reachable only at <code>localhost</code>. Every other step in the loop has a <code>make</code> target; this one has nothing.</p></div>
+    <div class="zero-item"><h3>0 lines of vibium</h3><p>217 days, nothing toward the fork's stated V1 goal — now formalized by an open draft PR declaring <code>apps/</code> a sandbox.</p></div>
+  </div>
+
+  <figure>
+    <img src="images/02-glass-case.png" alt="Nano Banana render: a brass measuring instrument under a bell jar in an empty gallery at dawn, one empty chair facing it." loading="lazy">
+    <figcaption>Nano Banana Pro (gemini-3-pro-image-preview) · prompt below</figcaption>
+  </figure>
+  <details class="nb-prompt"><summary>NB / Nano Banana prompt</summary>
+  <div class="prompt-block">A beautifully machined brass and glass measuring instrument standing alone under a spotless bell jar on a marble plinth in an empty museum gallery at dawn, its dial fully lit and readable, with a single empty visitor's chair angled toward it and a coil of unplugged cable curled neatly at the base of the plinth. Rendered as a photorealistic architectural interior photograph with soft volumetric light, shallow depth of field on the dial and crisp reflections in the glass, lit by cool early daylight entering from tall windows on the right. The composition features a medium three-quarter view at the instrument's eye level with generous empty floor in the foreground. Color palette emphasizes polished brass, cool grey marble, pale blue morning light and one small amber glow from the instrument's own lamp. The mood is admiring and slightly lonely — an excellent thing nobody has come to see.</div>
+  </details>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">05 · contradictions</span></div>
+  <div class="col">
+    <h2>Three things the record disagrees with</h2>
+    <div class="contradiction">
+      <p class="said">"I am not comfortable in using git."  — interview, 2026-07-16</p>
+      <p class="logged">Six commits in September are authored under his own git identity, and fifteen merges are his. The explanation for seven months of non-shipping has outlived its truth.</p>
+    </div>
+    <div class="contradiction">
+      <p class="said">Behavior over self-report — the premise this whole record was commissioned on.</p>
+      <p class="logged">The record itself went unread for eight weeks. The scorecard due 2026-08-16 was never filled in, during the most productive stretch on file. A record kept by hand does not survive a sprint; that is why the counting is now a script.</p>
+    </div>
+    <div class="contradiction">
+      <p class="said">CLAUDE.md, still, today: "Current Goal: V1 by Christmas."</p>
+      <p class="logged">Zero lines toward V1-ROADMAP.md in 217 days, and an open draft PR that says <code>apps/</code> has nothing to do with browser automation. One of those two sentences should be deleted. A stale goal quietly taxes every future decision about what belongs here.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">06 · state of the art today</span></div>
+  <div class="two">
+    <div>
+      <h3>Genuinely ahead</h3>
+      <ul class="tight">
+        <li><b>The plan is a committed document</b>, not a chat message — and the debriefs record which parts of it the build proved wrong.</li>
+        <li><b>Milestone-sized PRs with a sleep in the middle.</b> The best known guard against large, plausible, unreviewed agent diffs.</li>
+        <li><b>26,044 words of debrief</b> — one nine-step LEARNING part per milestone.</li>
+        <li><b>Dependency abstinence.</b> A 3D view hand-rolled in ~100 lines rather than adding three.js; the app opens from <code>file://</code>.</li>
+        <li><b>Self-instrumentation.</b> A session id in every commit trailer is what makes this whole audit possible.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Behind, and not for lack of skill</h3>
+      <ul class="tight">
+        <li><b>No CI</b> during the fastest week on record.</li>
+        <li><b>No distribution.</b> The last mile is the only step in the loop with no tooling — which is exactly why it never happens.</li>
+        <li><b>No visual baselines.</b> Screenshots do real work here, then are thrown away.</li>
+        <li><b>No use telemetry</b>, not even for himself. The instrument-maker takes no measurements.</li>
+        <li><b>No second reader.</b> Every design decision reviewed by one person and one model.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Layer</th><th>Choice</th><th>The refusal that defines it</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td>Vanilla JS, canvas + SVG</td><td>No dependencies, no build step, opens from <code>file://</code></td></tr>
+      <tr><td>Tests</td><td><code>node --test</code></td><td>No framework, no runner, no config — 267 cases</td></tr>
+      <tr><td>Serving</td><td><code>python3 -m http.server</code></td><td>31 make targets; the Makefile is the entire UI</td></tr>
+      <tr><td>Illustration</td><td>Nano Banana / Gemini</td><td>The one place outside tooling is allowed in — 16 images</td></tr>
+      <tr><td>Harness</td><td>Claude Code, session trailers, <code>/ship</code> <code>/triage</code> <code>/tryit</code></td><td>The harness records itself</td></tr>
+      <tr><td>Self-tracking</td><td><code>make track</code></td><td>No network, no key — nothing leaves the machine</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">07 · possible futures</span></div>
+  <div class="col">
+    <p>Calibrated guesses from a fifteen-day record, not measurements — which is why each carries an
+    indicator you can check in days. When one resolves, write down which, and when. An unscored
+    forecast is a horoscope.</p>
+  </div>
+
+  <div class="scen">
+    <div class="scen-head"><h3>The workshop deepens</h3><span class="pct">45%</span></div>
+    <div class="meter"><span style="width:45%"></span></div>
+    <p>M9 through M12, a fourth instrument in <code>apps/</code>, 40,000 words of debrief. Everything
+    gets better and nothing gets seen. Highest probability because it is the current trajectory and
+    nothing about it feels like a problem.</p>
+    <p class="ind">Indicator: the next session opens a milestone instead of a deploy.</p>
+  </div>
+  <div class="scen">
+    <div class="scen-head"><h3>The crash</h3><span class="pct">25%</span></div>
+    <div class="meter"><span style="width:25%"></span></div>
+    <p>Four of four previous bursts were followed by a silence of 16 to 88 days. Today is day five of
+    the heaviest run in the record, and the commit counts through it went 3, 7, 3, 9, 2.</p>
+    <p class="ind">Indicator: no commit by 2026-09-27 confirms it. Any commit before then falsifies it.</p>
+  </div>
+  <div class="scen">
+    <div class="scen-head"><h3>The audience test finally runs</h3><span class="pct">15%</span></div>
+    <div class="meter"><span style="width:15%"></span></div>
+    <p>One person opens the Driver Load Path in a browser. This is the only branch that changes what
+    the record means, and the only one that has been top of two consecutive roadmaps without ever
+    being attempted. Base rate governs the number.</p>
+    <p class="ind">Indicator: a deploy config appears in the tree — or a person gets named out loud.</p>
+  </div>
+  <div class="scen">
+    <div class="scen-head"><h3>Load Path becomes a real thing</h3><span class="pct">10%</span></div>
+    <div class="meter"><span style="width:10%"></span></div>
+    <p>Contact-force splits, exact exponential integration, a second-order body, an assumptions
+    drawer that shows its own provenance. For driving instructors, ergonomics students or sim-racing
+    forums this is a teaching tool. It demands the thing avoided and the thing enjoyed at once, so it
+    can wear the first scenario's clothes for months.</p>
+    <p class="ind">Indicator: a README that addresses a stranger rather than its author.</p>
+  </div>
+  <div class="scen">
+    <div class="scen-head"><h3>The mirror becomes the product</h3><span class="pct">5%</span></div>
+    <div class="meter"><span style="width:5%"></span></div>
+    <p>The most distributable thing in this repository is not an app. It is 200 lines of POSIX shell
+    that answers "what does my record actually say about how I work?" against any git repo, with no
+    install, no network and no key — and it is the only artifact here that needs no deploy step to be
+    useful to someone else.</p>
+    <p class="ind">Indicator: it gets run against a repository that is not this one.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">08 · next thirty days</span></div>
+  <div class="col"><h2>One merge is not one reader</h2>
+  <p>Cycle one proved he will do anything he has specified. The specification for exposure is still
+  missing; everything below is either that specification or protection for the rhythm that made
+  cycle one work.</p></div>
+  <div class="actions">
+    <div class="act"><span class="tag p0">P0 · 7 days</span><div><b>Name the person first, then deploy.</b>
+      <p>The app is static and zero-dependency — there is no technical step left, only a recipient. Naming the person after the deploy turns this into scenario one.</p></div></div>
+    <div class="act"><span class="tag p0">P0 · 7 days</span><div><b>Answer the four fields git cannot see, with dates.</b>
+      <p>A dated zero is a finding. A blank is a dodge.</p></div></div>
+    <div class="act"><span class="tag">P1</span><div><b>Add CI: <code>make test</code> on push.</b><p>267 tests, zero automation, during the fastest week on record.</p></div></div>
+    <div class="act"><span class="tag">P1</span><div><b>Resolve the stale mission statement.</b><p>Merge the sandbox PR and rewrite the goal line to whichever is true — workshop, or browser-automation fork.</p></div></div>
+    <div class="act"><span class="tag">P1</span><div><b>Branch hygiene, one pass.</b><p>Eight dead branches, plus one abandoned 165 days ago that still needs a single click.</p></div></div>
+    <div class="act"><span class="tag">Protect</span><div><b>Plan a small session around 2026-09-20, not a big one.</b>
+      <p>Twenty minutes: <code>make track</code>, reread the mirror, fill the scorecard. A rhythm survives a small session; it does not survive a skipped one.</p></div></div>
+    <div class="act"><span class="tag">Stop</span><div><b>Stop letting a merge feel like a ship.</b>
+      <p><code>/ship</code> now requires a link, or an explicit "nobody, and I accept that." An acknowledged audience of one is a decision; an unacknowledged one is the thing this record exists to catch.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sect-head"><span class="eyebrow">09 · how the record maintains itself</span></div>
+  <div class="col">
+    <p>The July version of this system was a set of documents someone had to remember to update, and
+    it went eight weeks without being touched. The counting is now one command that reads git and
+    nothing else:</p>
+  </div>
+  <pre>make track                        # regenerate reflections/metrics.md
+TRACK_OFFLINE=1 sh reflections/track.sh    # no network at all
+TRACK_TZ=Europe/Berlin make track          # recount the clock elsewhere</pre>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>File</th><th>Kind</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><code>metrics.md</code></td><td>generated</td><td>What happened, in numbers. Never hand-edited.</td></tr>
+      <tr><td><code>evidence.md</code></td><td>append-only</td><td>Dated facts with receipts, and hypotheses for the next pass.</td></tr>
+      <tr><td><code>mirror.md</code></td><td>append-only</td><td>The portrait. Old readings stay on the page so they can be wrong in public.</td></tr>
+      <tr><td><code>roadmap.md</code></td><td>working</td><td>Next actions and the scorecard, including the rows git cannot see.</td></tr>
+      <tr><td><code>futures.md</code></td><td>working</td><td>State of the art, scenarios, and the sheet they get scored on.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="col">
+    <p>One rule holds the whole thing together: the script measures what git can see, and git cannot
+    see whether another human ever opened any of this. Those fields are left blank on purpose, and a
+    blank is a finding.</p>
+  </div>
+</section>
+
+<footer>
+  <div>David Berkowitz · research from Anthropic Claude · images from Google Gemini Nano Banana</div>
+  <div>Compiled 2026-09-13 from github.com/davidberkowitz/vibium — 217 days of git history, 45 commits, 17 pull requests. Hard numbers generated by <code>reflections/track.sh</code>.</div>
+  <div>Next scoring date 2026-10-13. Predictions on file: a gap of ≥14 days (25%), and an audience of one (15%).</div>
+</footer>
+</div>
+
+<script>
+(function(){
+  const svgns="http://www.w3.org/2000/svg";
+  const el=(n,a)=>{const e=document.createElementNS(svgns,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+  // --- cadence strip -------------------------------------------------------
+  const days={"2026-02-08":1,"2026-03-31":1,"2026-06-27":2,"2026-07-04":1,"2026-07-17":3,
+    "2026-07-21":2,"2026-08-17":4,"2026-08-21":1,"2026-09-06":2,"2026-09-10":4,
+    "2026-09-09":2,"2026-09-11":1,"2026-09-12":5,"2026-09-13":1};
+  const t0=Date.parse("2026-02-08"), t1=Date.parse("2026-09-13");
+  const cx=d=>20+(Date.parse(d)-t0)/(t1-t0)*855;
+  const g=document.getElementById("cadence");
+  Object.entries(days).forEach(([d,n])=>{
+    const h=n*17, x=cx(d);
+    const r=el("rect",{x:x-3,y:150-h,width:6,height:h,fill:"var(--build)",class:"bar",rx:2});
+    r.appendChild(el("title")).textContent=d+" — "+n+" commit"+(n>1?"s":"");
+    g.appendChild(r);
+  });
+  const an=document.getElementById("annot");
+  const mark=(d,label,dy,side)=>{
+    const x=cx(d), left=side==="left";
+    an.appendChild(el("line",{x1:x,y1:28+dy,x2:x,y2:150,stroke:"var(--merge)","stroke-width":1,"stroke-dasharray":"3 3"}));
+    const t=el("text",{x:left?x-7:x+7,y:26+dy,"text-anchor":left?"end":"start",
+      "font-family":"IBM Plex Mono, monospace","font-size":11,fill:"var(--merge)"});
+    t.textContent=label; an.appendChild(t);
+  };
+  mark("2026-07-21","session rules written → first merge",0,"right");
+  mark("2026-09-09","the five-day run: 12,129 lines →",22,"left");
+
+  // --- clock chart ---------------------------------------------------------
+  const build={8:2,10:3,11:1,12:2,13:1,15:4,16:1,17:6,20:2,21:4,22:3,23:1};
+  const merge={6:1,7:1,8:1,10:2,12:1,15:1,17:2,18:2,21:1,22:2,23:1};
+  const hours=[]; for(let h=6;h<=23;h++)hours.push(h);
+  const W=900,H=230,L=34,R=10,B=42,T=14, max=6;
+  const bw=(W-L-R)/hours.length, y=v=>H-B-(v/max)*(H-B-T);
+  const grid=document.getElementById("clock-grid");
+  [0,2,4,6].forEach(v=>{
+    grid.appendChild(el("line",{x1:L,y1:y(v),x2:W-R,y2:y(v),stroke:"var(--rule)","stroke-width":1}));
+    const t=el("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-family":"IBM Plex Mono, monospace","font-size":10,fill:"var(--muted)"});
+    t.textContent=v; grid.appendChild(t);
+  });
+  const c=document.getElementById("clock");
+  hours.forEach((h,i)=>{
+    const x0=L+i*bw, pad=3, half=(bw-pad*3)/2;
+    [[build[h]||0,"var(--build)",x0+pad],[merge[h]||0,"var(--merge)",x0+pad+half+pad]].forEach(([v,col,x],k)=>{
+      if(!v)return;
+      const hgt=(H-B-T)*(v/max);
+      const r=el("rect",{x:x,y:y(v),width:half,height:hgt,fill:col,class:"bar",rx:2});
+      r.appendChild(el("title")).textContent=String(h).padStart(2,"0")+":00 — "+v+" "+(k?"merge":"work")+(v>1?"s":"");
+      c.appendChild(r);
+    });
+    const t=el("text",{x:x0+bw/2,y:H-B+16,"text-anchor":"middle","font-family":"IBM Plex Mono, monospace","font-size":10,fill:"var(--muted)"});
+    t.textContent=String(h).padStart(2,"0"); c.appendChild(t);
+  });
+  const lbl=(x,yy,txt,col,anchor)=>{const t=el("text",{x:x,y:yy,"font-family":"IBM Plex Mono, monospace","font-size":11,fill:col,"text-anchor":anchor||"middle"});t.textContent=txt;c.appendChild(t);};
+  lbl(L+11.5*bw, y(6)-8, "6", "var(--build)");
+  lbl(L+4*bw, y(2)-8, "2", "var(--merge)");
+  lbl(L+1.2*bw, H-B+32, "← merged after sleeping", "var(--merge)", "start");
+  lbl(W-R, H-B+32, "built at night →", "var(--build)", "end");
+
+  // --- latency strip -------------------------------------------------------
+  const lat=[["vault → main",408,"before"],["session rules → main",744,"before"],
+    ["plan PR",0.05,"after"],["M0",8.6,"after"],["M1 fix",0.03,"after"],["M2",2.2,"after"],
+    ["M3",10.0,"after"],["M4",8.5,"after"],["M5",2.0,"after"],["README",0.3,"after"],
+    ["M6",5.9,"after"],["M7",5.4,"after"],["M8",8.9,"after"]];
+  const lg=document.getElementById("lat");
+  const lx=v=>40+(Math.log10(v)-Math.log10(0.02))/(Math.log10(1000)-Math.log10(0.02))*(860-40-20);
+  lg.appendChild(el("line",{x1:40,y1:86,x2:840,y2:86,stroke:"var(--rule)","stroke-width":1}));
+  [[0.033,"2 min"],[1,"1 hour"],[8,"overnight"],[24,"1 day"],[168,"1 week"],[720,"1 month"]].forEach(([v,t])=>{
+    const x=lx(v);
+    lg.appendChild(el("line",{x1:x,y1:80,x2:x,y2:92,stroke:"var(--rule)","stroke-width":1}));
+    const tx=el("text",{x:x,y:110,"text-anchor":"middle","font-family":"IBM Plex Mono, monospace","font-size":10,fill:"var(--muted)"});
+    tx.textContent=t; lg.appendChild(tx);
+  });
+  lat.forEach(([name,v,grp])=>{
+    const x=lx(v), yy=grp==="before"?58:86, col=grp==="before"?"var(--zero)":"var(--build)";
+    const cc=el("circle",{cx:x,cy:yy,r:6,fill:col,stroke:"var(--panel)","stroke-width":2,class:"bar"});
+    cc.appendChild(el("title")).textContent=name+" — "+(v>=24?(v/24).toFixed(0)+" days":v.toFixed(2)+" hours");
+    lg.appendChild(cc);
+  });
+  const note=(x,yy,txt,col,anchor)=>{const t=el("text",{x:x,y:yy,"font-family":"IBM Plex Mono, monospace","font-size":11,fill:col,"text-anchor":anchor||"start"});t.textContent=txt;lg.appendChild(t);};
+  note(lx(408)-10,40,"before the rule: 17 and 31 days","var(--zero)","end");
+  note(40,136,"after the rule: 11 merges, median 5.4 hours","var(--build)");
+})();
+</script>

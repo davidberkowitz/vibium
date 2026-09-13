@@ -1,4 +1,4 @@
-.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap test-gridprobe mindmap gridprobe double-tap help
+.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap test-gridprobe test-loadpath mindmap gridprobe loadpath loadpath-report track double-tap help
 
 # Default target
 all: build
@@ -106,6 +106,13 @@ loadpath-report:
 loadpath:
 	@echo "Driver Load Path: http://localhost:8081"
 	cd apps/loadpath && python3 -m http.server 8081
+
+# Regenerate reflections/metrics.md from git history (no network needed)
+#   make track            -> writes reflections/metrics.md, prints the summary
+track:
+	@sh reflections/track.sh > reflections/metrics.md
+	@echo "Wrote reflections/metrics.md"
+	@sed -n '7,17p' reflections/metrics.md
 
 # Serve the mind map app on http://localhost:8080
 mindmap:
