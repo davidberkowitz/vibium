@@ -20,7 +20,7 @@ const { LoadPathConstants: C, LoadPathVehicle: V, LoadPathOccupant: O,
 
 const G = C.G;
 const SEDAN = C.VEHICLES.sedan;
-const DRIVER = C.OCCUPANTS.m50.mass;
+const DRIVER = C.OCCUPANT_MASS.value;
 const TOL = 1e-9;
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
@@ -51,11 +51,14 @@ describe('constants and provenance', () => {
     const missing = [];
     for (const [group, entries] of [['VEHICLES', C.VEHICLES],
                                     ['SURFACES', C.SURFACES],
-                                    ['OCCUPANTS', C.OCCUPANTS]]) {
+                                    ['OCCUPANT_MASS', { '': C.OCCUPANT_MASS }]]) {
       for (const [name, obj] of Object.entries(entries)) {
         for (const [field, value] of Object.entries(obj)) {
           if (typeof value !== 'number') continue;
-          const key = `${group}.${name}.${field}`;
+          const key = name ? `${group}.${name}.${field}` : `${group}.${field}`;
+          // min/max/step describe the SLIDER, not the model; the span they
+          // form is what carries a source, as OCCUPANT_MASS.range.
+          if (group === 'OCCUPANT_MASS' && field !== 'value') continue;
           if (!C.PROVENANCE[key]) missing.push(key);
         }
       }
@@ -66,7 +69,7 @@ describe('constants and provenance', () => {
   test('provenance values agree with the constants they describe', () => {
     assert.strictEqual(C.PROVENANCE['VEHICLES.sedan.mass'].value, SEDAN.mass);
     assert.strictEqual(C.PROVENANCE['SURFACES.dry.mu'].value, C.SURFACES.dry.mu);
-    assert.strictEqual(C.PROVENANCE['OCCUPANTS.m50.mass'].value, DRIVER);
+    assert.strictEqual(C.PROVENANCE['OCCUPANT_MASS.value'].value, DRIVER);
   });
 });
 
@@ -338,10 +341,13 @@ describe("occupant: Newton's third law audit (EQ 6) — the gate for M0", () => 
     });
   }
 
-  test('the audit holds across every occupant preset', () => {
-    for (const key of Object.keys(C.OCCUPANTS)) {
-      const s = O.solve({ bodyMass: C.OCCUPANTS[key].mass, accel: O.vec(-6, 4, -1) });
-      assert.ok(O.auditThirdLaw(s).worst < 1e-9, `${key} failed the audit`);
+  test('the audit holds at every mass the slider can reach', () => {
+    // Was three named presets. It is a sweep now, because the input is
+    // continuous — and a range the user can drag has to hold everywhere in it,
+    // not at three points someone thought to list.
+    for (let m = C.OCCUPANT_MASS.min; m <= C.OCCUPANT_MASS.max; m += 0.5) {
+      const s = O.solve({ bodyMass: m, accel: O.vec(-6, 4, -1) });
+      assert.ok(O.auditThirdLaw(s).worst < 1e-9, `${m} kg failed the audit`);
     }
   });
 

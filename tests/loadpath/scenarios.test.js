@@ -152,7 +152,7 @@ describe('scenario consistency: does the speed profile match the pedals', () => 
     const bodyForce = (inputs) => {
       const v = solveVehicle(inputs);
       return O.solve({
-        bodyMass: C.OCCUPANTS.m50.mass,
+        bodyMass: C.OCCUPANT_MASS.value,
         accel: O.vec(v.accel.x, v.accel.y, 0),
         gravity: O.gravityForGrade(inputs.gradePercent)
       }).carOnBody;
@@ -186,7 +186,7 @@ describe('the stopped-car rule', () => {
     const v = solveVehicle(inputs);
     assert.equal(v.accel.x, 0);
     const body = O.solve({
-      bodyMass: C.OCCUPANTS.m50.mass,
+      bodyMass: C.OCCUPANT_MASS.value,
       accel: O.vec(0, 0, 0),
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
@@ -251,7 +251,7 @@ describe('the body lag', () => {
     const settled = l.value();
 
     const bodyOf = (a) => O.solve({
-      bodyMass: C.OCCUPANTS.m50.mass,
+      bodyMass: C.OCCUPANT_MASS.value,
       accel: O.vec(a.x, a.y, 0),
       gravity: O.gravityForGrade(inputs.gradePercent)
     });
@@ -282,7 +282,7 @@ describe('the body lag', () => {
     for (let i = 0; i < 40; i++) {
       const a = l.step(want, 0.016);
       const body = O.solve({
-        bodyMass: C.OCCUPANTS.m50.mass,
+        bodyMass: C.OCCUPANT_MASS.value,
         accel: O.vec(a.x, a.y, 0),
         gravity: O.gravityForGrade(0)
       });

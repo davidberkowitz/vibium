@@ -273,7 +273,7 @@ describe('SEPARATION: vibration must not leak into the force solver', () => {
     // The gating test for this milestone. Road roughness is a vibration input
     // and nothing else; if a comfort index ever reaches the arrows, this fails.
     const body = O.solve({
-      bodyMass: C.OCCUPANTS.m50.mass,
+      bodyMass: C.OCCUPANT_MASS.value,
       accel: O.vec(-4, 2, 0),
       gravity: O.gravityForGrade(0)
     });
@@ -296,7 +296,7 @@ describe('SEPARATION: vibration must not leak into the force solver', () => {
     // up immediately as an absurd number rather than a plausible one.
     assert.ok(r.av < 10, 'a comfort value in m/s^2 is a small number');
     const body = O.solve({
-      bodyMass: C.OCCUPANTS.m50.mass, accel: O.vec(0, 0, 0),
+      bodyMass: C.OCCUPANT_MASS.value, accel: O.vec(0, 0, 0),
       gravity: O.gravityForGrade(0)
     });
     assert.ok(K.solve(body.carOnBody).byTouchpoint.seat_pan.magnitude > 100,

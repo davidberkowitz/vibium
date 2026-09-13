@@ -6,7 +6,14 @@
    credibility it has not earned. So this milestone ends at a console table.
 
    Run:  node apps/loadpath/js/m0-report.js
-         node apps/loadpath/js/m0-report.js --surface wet --driver f05
+         node apps/loadpath/js/m0-report.js --surface wet --mass 95
+
+   --driver m50|f05|m95 still works and still picks the same three masses, but
+   it prints a notice and is no longer the documented way in. Those keys named
+   percentiles and a sex; every one of them multiplied the same segment
+   fractions from Dempster's nine male cadavers, so only the mass ever changed.
+   This CLI is where that label actually shipped to a user, which is why M7
+   started here.
 
    This file is scaffolding. It goes away when js/app.js arrives in M1.
 */
@@ -29,13 +36,34 @@ function arg(name, fallback) {
 }
 
 const surfaceKey = arg('surface', 'dry');
-const driverKey = arg('driver', 'm50');
 const surface = C.SURFACES[surfaceKey];
-const driver = C.OCCUPANTS[driverKey];
 const car = C.VEHICLES.sedan;
 
 if (!surface) { console.error(`Unknown surface "${surfaceKey}". Try: ${Object.keys(C.SURFACES).join(', ')}`); process.exit(1); }
-if (!driver) { console.error(`Unknown driver "${driverKey}". Try: ${Object.keys(C.OCCUPANTS).join(', ')}`); process.exit(1); }
+
+/* Retired keys, kept working so the documented command from M0 does not break,
+   but answered with the correction rather than silently. */
+const LEGACY_DRIVERS = { m50: 78, f05: 49, m95: 101 };
+const legacyKey = arg('driver', null);
+let bodyMass = parseFloat(arg('mass', C.OCCUPANT_MASS.value));
+
+if (legacyKey != null) {
+  if (!(legacyKey in LEGACY_DRIVERS)) {
+    console.error(`Unknown driver "${legacyKey}". Use --mass <kg> instead; --driver accepts only ${Object.keys(LEGACY_DRIVERS).join(', ')}.`);
+    process.exit(1);
+  }
+  bodyMass = LEGACY_DRIVERS[legacyKey];
+  console.log(`note: --driver ${legacyKey} now means --mass ${bodyMass}. The old`);
+  console.log('      labels named a sex and a percentile, but the segment mass');
+  console.log('      fractions behind all three come from one sample of nine male');
+  console.log('      cadavers, so only the total mass ever changed. See the');
+  console.log("      OCCUPANT_MASS provenance record.\n");
+}
+
+if (!(bodyMass >= C.OCCUPANT_MASS.min && bodyMass <= C.OCCUPANT_MASS.max)) {
+  console.error(`--mass must be between ${C.OCCUPANT_MASS.min} and ${C.OCCUPANT_MASS.max} kg.`);
+  process.exit(1);
+}
 
 /* Driver inputs, not accelerations — the point is that the model derives the
    accelerations from what a person actually does with their hands and feet. */
@@ -61,7 +89,7 @@ console.log('  DRIVER LOAD PATH — M0 model core');
 console.log('  ' + rule('=', 96));
 console.log(`  Vehicle   ${car.label}: ${car.mass} kg, wheelbase ${car.wheelbase} m, track ${car.track} m, CG ${car.cgHeight} m`);
 console.log(`  Surface   ${surface.label}, mu ${surface.mu.toFixed(2)} — traction limit ${(surface.mu * G).toFixed(2)} m/s2 (${surface.mu.toFixed(2)} g)`);
-console.log(`  Driver    ${driver.label}, ${driver.mass} kg — ${((driver.mass / car.mass) * 100).toFixed(1)}% of vehicle mass`);
+console.log(`  Occupant  ${bodyMass} kg — ${((bodyMass / car.mass) * 100).toFixed(1)}% of vehicle mass (a mass, not a body type)`);
 console.log(`  Frame     ISO 8855: x forward, y to the driver's left, z up`);
 console.log('');
 
@@ -73,7 +101,7 @@ console.log('  ' + rule('-', 96));
 
 const solved = SCENARIOS.map(sc => {
   const state = V.solve({ speed: sc.speed, steerAngle: sc.steerAngle, ax: sc.ax, mu: surface.mu }, car);
-  const occ = O.solve({ bodyMass: driver.mass, accel: state.accel });
+  const occ = O.solve({ bodyMass: bodyMass, accel: state.accel });
   const split = K.solve(occ.carOnBody);
   return { sc, state, occ, split };
 });
@@ -106,7 +134,7 @@ for (const { sc, state } of solved) {
 }
 
 console.log('');
-console.log(`  FORCES ON AND FROM THE DRIVER (${driver.mass} kg)`);
+console.log(`  FORCES ON AND FROM THE DRIVER (${bodyMass} kg)`);
 console.log('  ' + rule('-', 96));
 console.log('  ' + S('Scenario', 24) + S('g-load', 9) + S('car->body (N)', 30) +
             S('body->car (N)', 30));
