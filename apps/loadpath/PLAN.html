@@ -174,11 +174,11 @@ footer b{color:var(--ink-2);font-weight:600}
   <p class="deck">A browser simulation of every force a car and its driver push through each other, at each of the twelve places where they touch. Real units, stated assumptions, both directions of every arrow.</p>
   <dl class="tb">
     <div><dt>Repository</dt><dd>vibium / apps/loadpath</dd></div>
-    <div><dt>Revision</dt><dd>G &middot; M5 built</dd></div>
+    <div><dt>Revision</dt><dd>H &middot; M6 judged</dd></div>
     <div><dt>Date</dt><dd>2026-09-10</dd></div>
     <div><dt>Status</dt><dd>M3 green, 136 tests</dd></div>
     <div><dt>Fidelity</dt><dd>Real numbers, simplified model</dd></div>
-    <div><dt>Views</dt><dd>2D primary, 3D gated</dd></div>
+    <div><dt>Views</dt><dd>2D primary, 3D kept &mdash; figure cut</dd></div>
     <div><dt>Regimes</dt><dd>Cruise, corner, brake, accel, vibration</dd></div>
     <div><dt>Control</dt><dd>Live sliders + playback</dd></div>
   </dl>
@@ -375,7 +375,7 @@ footer b{color:var(--ink-2);font-weight:600}
 │   │   ├── <b>side.js</b>           <i>built &middot; elevation, the twelve contacts placed on anatomy</i>
 │   │   ├── <b>plan.js</b>           <i>built &middot; overhead, lateral channels and tyre load</i>
 │   │   └── <b>spectrum.js</b>       <i>built &middot; M5 &middot; the weighted spectrum, in its own hue</i>
-│   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gated, may be cut</i>
+│   ├── view3d/<b>scene.js</b>       <i>M6 &middot; gate passed, no figure</i>
 │   ├── ui/
 │   │   ├── <b>controls.js</b>       <i>built &middot; five sliders, surface, live traction gauge</i>
 │   │   └── <b>assumptions.js</b>    <i>built &middot; the provenance drawer</i>
@@ -409,7 +409,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
     <div class="ms-row done"><span class="ms-id">M3</span><div class="ms-b"><h3>Plan view and live sliders</h3><p>Overhead view added. Speed, steering angle, brake, throttle and grade become interactive. Friction ellipse clamps the display and says so. <b>Done.</b> Grade is real rather than faked: gravity tilts into the cabin, which is why a hill presses you into the seat back while standing still. The plan view also surfaces the per-corner tyre loads the vehicle solver has computed since M0 and nothing had ever drawn.</p></div><span class="ms-out">2 views<br>5 inputs + surface</span></div>
     <div class="ms-row done"><span class="ms-id">M4</span><div class="ms-b"><h3>Scripted playback</h3><p>Scenario presets as input timelines with a transport bar. First-order lag on the body response so it stops looking instantaneous. <b>Done.</b> Playback is not a second code path &mdash; it is the same chain with its inputs coming from a clock. The lag sits between vehicle and occupant, so mid-maneuver the two drawings deliberately disagree and the gap is printed. It is a transient and nothing else: settled states are identical with it on or off, asserted to 1e&minus;6&nbsp;N per contact, and the frame loop stops requesting frames once it settles.</p></div><span class="ms-out">play / scrub<br>4 presets</span></div>
     <div class="ms-row done"><span class="ms-id">M5</span><div class="ms-b"><h3>Vibration overlay</h3><p>Road input as a separate frequency-domain channel drawn over the quasi-static state, with ISO comfort banding. Deliberately not a fourth axis of the same solver. <b>Done.</b> ISO 8608 road class and speed into a displacement PSD, a quarter car and a seat mode to the occupant, Wk and Wd evaluated as continuous transfer functions, then a band-limited RMS and EQ 7. The separation is enforced by a test rather than by intent: changing the road class must move no contact force by a single newton.</p></div><span class="ms-out">Wk/Wd filter<br>comfort band</span></div>
-    <div class="ms-row"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below.</p></div><span class="ms-out">optional view<br>go / no-go</span></div>
+    <div class="ms-row done"><span class="ms-id">M6</span><div class="ms-b"><h3>3D toggle, gated</h3><p>Procedural low-poly seated figure in three.js sharing the M0 model. Ship only if it clears the quality bar in the gate below. <b>Partly done, and the gate is the reason.</b> The view ships; the figure does not. Neither three.js nor a body survived contact with the gate &mdash; see the verdict below.</p></div><span class="ms-out">3D resultant<br>212 tests green</span></div>
   </div>
   <div class="note" style="margin-top:24px"><b>Two departures from this plan at M2</b>
   First, the solver is <strong>box-constrained, not merely unilateral</strong>. This document specified only that foam cannot pull and webbing cannot push. Without also capping how hard a driver can brace, the solver braces its way out of any deceleration and concludes the belts never carry anything &mdash; a comfortable-sounding result that is wrong. Adding an upper bound is the same solver with a clamp in place of a maximum, and it is what makes the belts engage in a hard stop and stay slack in a gentle one.
@@ -417,6 +417,12 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 
   <div class="gate" style="margin-top:24px"><b>Go / no-go gate on the 3D view</b>
   The artifact content policy blocks external asset hosts, so there is no rigged human mesh to load. The 3D body has to be built procedurally, and procedural humans usually look wrong. A body that looks wrong will undermine numbers that are right, which is a net loss. If the M6 prototype does not look credible next to the 2D view, cut it and ship the 2D view alone. That is a real outcome, not a failure.</div>
+
+  <div class="gate" style="margin-top:18px"><b>The verdict, after building it</b>
+  <p style="margin:0 0 10px"><strong>Split: the view goes, the body is cut.</strong> The gate named the risk precisely and the risk was real &mdash; it was just wrong about where the line falls, and so was the first build.</p>
+  <p style="margin:0 0 10px">There was a figure. Not a mesh: a stick skeleton, nineteen joints, eighteen segments, reclined torso, one foot on the pedals and one on the rest. The reasoning was that the gate's failure mode is a procedural <em>human</em>, and that a diagram in the same drafting language as the other two views could not fail that way because it was not attempting a person. Rendered at six camera angles, it read as an ambiguous zigzag at every one of them. Next to the side elevation, which is legible in a glance, it was worse rather than better &mdash; and a viewer squinting at a body is a viewer not reading the vector. It was cut. Its two unit tests passed the entire time, which is the part worth keeping: the tests could say it was self-consistent and could not say it was legible, and legibility was what was on trial.</p>
+  <p style="margin:0 0 10px">What survived is everything that is not a body &mdash; the twelve contacts at their real positions, the cabin planes that locate them, and one force &mdash; plus the thing that made the view worth keeping at all. Drawing the resultant alone was not checkable: at 976&nbsp;N with 765&nbsp;N of that merely holding the body up, the arrow points very nearly straight up whatever the car is doing, and the claim that neither 2D drawing could show it was being asserted by a caption rather than shown by the picture. So the same vector is now drawn three times from one origin at one scale: whole, with the lateral axis dropped (all the side elevation can hold), and with the vertical dropped (all the plan can hold). The projections come out visibly shorter and pointing elsewhere, and each carries the angle it is missing &mdash; 31&deg; and 52&deg; in the combined case above. That is the &otimes; the side elevation has been admitting since M1, finally measured.</p>
+  <p style="margin:0">Three departures from this plan, all deliberate: no three.js (a dependency and a build step spent on the least certain milestone, against a promise that the app runs from <code>file://</code> with nothing installed); no figure (above); and the decomposition, which this plan never specified and which is the only reason the view earns its place beside two drawings that were already doing their jobs.</p></div>
 </section>
 
 <section>
@@ -555,7 +561,7 @@ tests/loadpath/<b>contacts.test.js</b>     <i>the split: balance, signs, caps, a
 </section>
 
 <footer>
-  <p><b>Driver Load Path</b> &middot; build plan, revision G &middot; <b>apps/loadpath</b> in the vibium repository.</p>
+  <p><b>Driver Load Path</b> &middot; build plan, revision H &middot; <b>apps/loadpath</b> in the vibium repository.</p>
   <p style="margin-top:8px">Prepared by <b>David Berkowitz</b>. Research and drafting with <b>Anthropic Claude</b>. Illustrations to be generated with <b>Google Gemini Nano Banana</b>.</p>
 </footer>
 </div>
