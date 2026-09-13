@@ -2,6 +2,14 @@
 
 Browser automation for AI agents and humans.
 
+## apps/ is a sandbox
+
+`apps/` holds side projects that have nothing to do with browser automation —
+currently `gridprobe`, `mindmap` and `loadpath`. They share this tree for
+convenience, not because they belong to vibium; the rules below about
+V1-ROADMAP.md, FILESYSTEM.md and the clicker binary do not apply inside `apps/`,
+and each app carries its own plan and README.
+
 ## Key Docs
 
 - V1-ROADMAP.md — Implementation plan with daily prompts
