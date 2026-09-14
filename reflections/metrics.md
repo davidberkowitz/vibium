@@ -1,6 +1,6 @@
 # metrics.md — generated, do not hand-edit
 
-Generated 2026-09-13 19:19 UTC by `reflections/track.sh`. Local clock: America/Los_Angeles.
+Generated 2026-09-14 04:58 UTC by `reflections/track.sh`. Local clock: America/Los_Angeles.
 Source: this repository's git history only. Upstream commits (<hugs@vibium.com>)
 are excluded from every number below.
 
@@ -8,11 +8,11 @@ are excluded from every number below.
 
 | Metric | Value |
 |---|---|
-| Commits authored under this fork | 45 (30 work, 15 merge) |
+| Commits authored under this fork | 47 (31 work, 16 merge) |
 | Calendar span | 217 days |
 | Days with any commit | 15 |
 | Duty cycle (active days / span) | 6.9% |
-| Merge commits on main | 15 |
+| Merge commits on main | 16 |
 
 ## 2. Sessions (grouped by Claude-Session trailer)
 
@@ -23,6 +23,7 @@ are excluded from every number below.
 | session_01RwGUjxNE | 4 | Aug 17 20:33 | Aug 17 21:33 | 1.0h | +1920 / -44 |
 | session_01JLGCaAi8 | 2 | Sep 06 17:27 | Sep 06 17:33 | 0.1h | +2013 / -2 |
 | session_01VrVRQcG8 | 13 | Sep 09 22:11 | Sep 13 08:15 | 82.1h | +12129 / -419 |
+| session_01EJQZTk43 | 1 | Sep 13 12:28 | Sep 13 12:28 | 0.0h | +1726 / -3 |
 
 ## 3. Rhythm — gaps between active days
 
@@ -42,7 +43,7 @@ are excluded from every number below.
 | 2026-09-10 | 7 | 1 |
 | 2026-09-11 | 3 | 1 |
 | 2026-09-12 | 9 | 1 |
-| 2026-09-13 | 3 | 1 |
+| 2026-09-13 | 5 | 1 |
 
 ## 4. Clock — commit hour, America/Los_Angeles
 
@@ -52,14 +53,14 @@ are excluded from every number below.
 08:00  3   ###
 10:00  5   #####
 11:00  1   #
-12:00  3   ###
+12:00  4   ####
 13:00  1   #
 15:00  5   #####
 16:00  1   #
 17:00  8   ########
 18:00  2   ##
 20:00  2   ##
-21:00  5   #####
+21:00  6   ######
 22:00  5   #####
 23:00  2   ##
 ```
@@ -70,7 +71,7 @@ Weekday split:
 Fri  8   ########
 Mon  4   ####
 Sat  12  ############
-Sun  6   ######
+Sun  8   ########
 Thu  8   ########
 Tue  4   ####
 Wed  3   ###
@@ -94,6 +95,7 @@ Wed  3   ###
 | Merge pull request #15 from davidberkowitz/claude/oc | Sep 12 17:40 | Sep 12 23:05 | 5.4 h |
 | Merge pull request #16 from davidberkowitz/claude/se | Sep 12 23:20 | Sep 13 08:12 | 8.9 h |
 | Merge pull request #17 from davidberkowitz/claude/ap | Sep 13 08:15 | Sep 13 12:10 | 3.9 h |
+| Merge pull request #18 from davidberkowitz/claude/ni | Sep 13 12:28 | Sep 13 21:57 | 9.5 h |
 
 ## 6. Where the effort goes (lines added, user commits only, by top-level path)
 
@@ -104,31 +106,32 @@ Wed  3   ###
     2442  extension/src
     1792  apps/gridprobe
     1074  clicker/internal
+     998  reflections/second-pass.html
      773  ios-insurance-card/InsuranceCard
      534  clicker/cmd
-     332  tests/mindmap
-     309  ios-insurance-card/InsuranceCard.xcodeproj
-     207  tests/gridprobe
-     198  reflections/evidence.md
-     194  reflections/mirror.md
-     139  reflections/roadmap.md
-     114  .claude/commands
+     466  reflections/evidence.md
+     462  reflections/LEARNING.md
+     424  reflections/track.sh
+     390  reflections/mirror.md
+     341  reflections/roadmap.md
+     334  reflections/futures.md
 ```
 
 ## 7. Stranded work — remote branches not merged into main
 
 - `claude/apps-sandbox-note` — merged (branch is dead weight, safe to delete), tip 0 days old
-- `claude/compassionate-hypatia-fbvdi9` — merged (branch is dead weight, safe to delete), tip 53 days old
-- `claude/doc-change-logger-extension-xaWqs` — **no merge commit on main** — verify whether a squash merge landed it, tip 57 days old
+- `claude/compassionate-hypatia-fbvdi9` — merged (branch is dead weight, safe to delete), tip 54 days old
+- `claude/doc-change-logger-extension-xaWqs` — **no merge commit on main** — verify whether a squash merge landed it, tip 58 days old
 - `claude/driver-vehicle-forces-3d` — merged (branch is dead weight, safe to delete), tip 1 days old
 - `claude/driver-vehicle-forces-z38xse` — merged (branch is dead weight, safe to delete), tip 1 days old
-- `claude/insurance-card-wallet-QQMPe` — **no merge commit on main** — verify whether a squash merge landed it, tip 165 days old
-- `claude/occupant-mass-input` — merged (branch is dead weight, safe to delete), tip 0 days old
+- `claude/insurance-card-wallet-QQMPe` — **no merge commit on main** — verify whether a squash merge landed it, tip 166 days old
+- `claude/nifty-mayer-kko971` — merged (branch is dead weight, safe to delete), tip 0 days old
+- `claude/occupant-mass-input` — merged (branch is dead weight, safe to delete), tip 1 days old
 - `claude/readme-windows-run` — merged (branch is dead weight, safe to delete), tip 1 days old
-- `claude/rotating-grid-distortion-zd4fvp` — merged (branch is dead weight, safe to delete), tip 6 days old
+- `claude/rotating-grid-distortion-zd4fvp` — merged (branch is dead weight, safe to delete), tip 7 days old
 - `claude/second-order-body` — merged (branch is dead weight, safe to delete), tip 0 days old
-- `claude/secure-api-key-vault-f9gwlr` — merged (branch is dead weight, safe to delete), tip 70 days old
-- `claude/visual-mind-map-app-knlfwv` — merged (branch is dead weight, safe to delete), tip 26 days old
+- `claude/secure-api-key-vault-f9gwlr` — merged (branch is dead weight, safe to delete), tip 71 days old
+- `claude/visual-mind-map-app-knlfwv` — merged (branch is dead weight, safe to delete), tip 27 days old
 
 Branches with no merge commit on main: **2**
 
@@ -143,8 +146,8 @@ content shipped. Check the pull request state before believing this line.
 | Test cases | 267 |
 | Makefile targets | 32 |
 | Apps in apps/ | 3 |
-| LEARNING.md debriefs | 2 |
-| Words of debrief written | 26044 |
+| LEARNING.md debriefs | 3 |
+| Words of debrief written | 28394 |
 
 ## 9. Fields git cannot see — fill by hand, date every answer
 
