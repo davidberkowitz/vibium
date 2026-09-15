@@ -115,7 +115,8 @@ specification or protection for the rhythm that made cycle 1 work.
    Done means: a URL exists, and one person who is not you has opened it.
 2. **Answer the four hand-filled fields, with dates, in the scorecard below.**
    Receipt: `metrics.md` §9 exists precisely because git cannot see them. A dated zero is a
-   finding; a blank is a dodge.
+   finding; a blank is a dodge. Rides in the same block as item 1 — it takes two minutes
+   once the link has been sent, and it is the row that proves it.
 
 ## P1 — this month (by 2026-10-13)
 
@@ -135,10 +136,13 @@ specification or protection for the rhythm that made cycle 1 work.
 
 ## Protective — do not let cycle 2 break what cycle 1 built
 
-7. **Expect the crash, and plan for a small session instead of none.** Base rate: 4 of 4
-   bursts in this record were followed by a gap of 16+ days. Around 2026-09-20, the useful
-   session is not a build — it is twenty minutes: `make track`, reread the bottom of
-   `mirror.md`, fill the scorecard. If the gap arrives anyway, it is data, not failure.
+7. **Expect the crash, and hold one block instead of none.** Base rate: 4 of 4 bursts in
+   this record were followed by a gap of 16+ days. The block on 2026-09-20 is not a build:
+   it opens with twenty minutes of instrument check — `make track`, reread the bottom of
+   `mirror.md`, fill the scorecard — and then spends whatever is left on the P1 items above
+   (CI, branches, the mission statement, the images). If it ends after the first twenty
+   minutes, that still counts. A rhythm survives a short session; it does not survive a
+   skipped one. If the gap arrives anyway, it is data, not failure.
 8. **`make track` becomes the first move of the ship step.** One command, five seconds. The
    July scorecard died of manual maintenance; this one cannot.
 9. **Keep, explicitly:** PR-per-milestone; building at night and merging after sleep;
@@ -153,6 +157,20 @@ specification or protection for the rhythm that made cycle 1 work.
     (`.claude/commands/ship.md`, step 3). If the honest answer is "nobody", say so and move
     on — an acknowledged audience of one is a decision. An unacknowledged one is the thing
     this whole directory exists to catch.
+
+## When this happens
+
+Three blocks, on the calendar, each two hours — not a scatter of fifteen-minute reminders
+that get dismissed:
+
+| Block | Covers |
+|---|---|
+| Wed 2026-09-16, 17:30–19:30 PT | P0: name the person, deploy loadpath, send the link, fill the scorecard rows |
+| Sun 2026-09-20, 17:30–19:30 PT | Instrument check, then P1: CI, branch hygiene, the mission statement, the images |
+| Tue 2026-10-13, 17:30–19:30 PT | Cycle close-out: `/reflect`, score the forecasts and hypotheses, open cycle 3 |
+
+All three sit at 17:30 PT because that is when the record says the work actually happens —
+the evening build window, not a morning someone wishes they used.
 
 ## Scorecard — check 2026-10-13
 
