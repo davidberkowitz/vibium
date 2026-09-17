@@ -52,3 +52,6 @@ screenshots/
 
 # NPM package tarballs
 *.tgz
+
+# Assembled deploy bundle (make loadpath-dist)
+build/
