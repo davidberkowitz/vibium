@@ -1,4 +1,4 @@
-.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap test-gridprobe test-loadpath mindmap gridprobe loadpath loadpath-report track double-tap help
+.PHONY: all build build-go build-js build-all-platforms package package-platforms package-main install-browser deps clean clean-bin clean-js clean-packages clean-cache clean-all serve test test-cli test-js test-mcp test-mindmap test-gridprobe test-loadpath mindmap gridprobe loadpath loadpath-report loadpath-dist track double-tap help
 
 # Default target
 all: build
@@ -106,6 +106,17 @@ loadpath-report:
 loadpath:
 	@echo "Driver Load Path: http://localhost:8081"
 	cd apps/loadpath && python3 -m http.server 8081
+
+# Assemble the publishable Driver Load Path bundle (what a stranger needs, nothing else)
+#   make loadpath-dist    -> build/loadpath/ with index.html, styles.css and js/
+# Deliberately excludes README.md, PLAN.html, LEARNING.md and images/ — those are
+# working documents, not part of the app, and a public URL should not carry them.
+loadpath-dist:
+	@rm -rf build/loadpath
+	@mkdir -p build/loadpath
+	@cp apps/loadpath/index.html apps/loadpath/styles.css build/loadpath/
+	@cp -R apps/loadpath/js build/loadpath/js
+	@echo "Built build/loadpath ($$(du -sh build/loadpath | cut -f1))"
 
 # Regenerate reflections/metrics.md from git history (no network needed)
 #   make track            -> writes reflections/metrics.md, prints the summary

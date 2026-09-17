@@ -107,6 +107,10 @@ specification or protection for the rhythm that made cycle 1 work.
    Receipt: 17 PRs, 0 review comments, 0 observers (metrics §7, GitHub PR list). The app is
    static, zero-dependency and runs from `file://` — it is already deployable; there is no
    technical step left, only the naming of a person.
+   **Deploy status 2026-09-17: done but for one click.** `make loadpath-dist` assembles the
+   bundle; the `gh-pages` branch carries it; `netlify.toml` points a Netlify build at the
+   same output. Settings → Pages → Deploy from a branch → `gh-pages` / root makes it public.
+   What remains is not technical.
    First action, in this order, and the order matters: **name the person first**, out loud,
    before any deploy work starts. Then one sentence to any session: "deploy apps/loadpath to
    a static host and give me the link." Then send: *"Built a thing that shows where a
@@ -179,7 +183,7 @@ the evening build window, not a morning someone wishes they used.
 | Merge commits on main | 15 | | generated: `make track` §1 |
 | **People who opened something built here** | **0** | | hand-filled, name them |
 | People who ran something built here | 0 | | hand-filled |
-| Live URLs for anything in `apps/` | 0 | | |
+| Live URLs for anything in `apps/` | 0 | | 2026-09-17: `gh-pages` branch pushed with the assembled bundle (`make loadpath-dist`), verified serving clean. Public URL goes live at davidberkowitz.github.io/vibium the moment Pages is switched on in repo Settings — the session's proxy blocks both the Netlify upload and the Pages API, so that switch is the one manual step. |
 | CI runs | 0 | | |
 | Unmerged/undeleted remote branches | 3 unmerged + 8 dead | | generated: `make track` §7 |
 | Days since last commit at check time | 0 | | tests H7 (predicted ≥14-day gap) |

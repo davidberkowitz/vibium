@@ -1,0 +1,18 @@
+# Netlify publishes exactly one thing out of this tree: the Driver Load Path app.
+#
+# `make loadpath-dist` assembles build/loadpath from apps/loadpath — index.html,
+# styles.css and js/ only. The working documents that live beside the app
+# (README.md, PLAN.html, LEARNING.md, images/) are left out on purpose, and
+# nothing else in this repository is ever served.
+#
+# The app is static: no dependencies, no bundler, opens from file://. The build
+# command copies files; that is the whole build.
+[build]
+  command = "make loadpath-dist"
+  publish = "build/loadpath"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
