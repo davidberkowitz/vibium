@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver Load Path — where the car touches you</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='9' r='4' fill='%23e6edf3'/%3E%3Cpath d='M13 13 L11 21 L22 21' stroke='%23e6edf3' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M24 16 V7' stroke='%23f2716b' stroke-width='2.4' fill='none'/%3E%3Cpath d='M24 5 l3 4 h-6z' fill='%23f2716b'/%3E%3Cpath d='M6 18 v9' stroke='%2358a6ff' stroke-width='2.4' fill='none'/%3E%3Cpath d='M6 29 l-3-4 h6z' fill='%2358a6ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="brand">Driver&nbsp;Load&nbsp;Path</span>
+    <span class="milestone">M8 · second-order body</span>
+    <div class="spacer"></div>
+    <span id="readout" class="readout"></span>
+    <button id="btn-assumptions" class="ghost" type="button">Assumptions</button>
+  </header>
+
+  <div id="controls"></div>
+  <div id="transport"></div>
+  <p id="limit-banner" class="limit-banner" hidden></p>
+
+  <main id="stage">
+    <section id="figure-wrap">
+      <div class="view-switch">
+        <button type="button" class="vs-btn on" data-view="2d">Two views</button>
+        <button type="button" class="vs-btn" data-view="3d">3D</button>
+        <span class="vs-note" id="vs-note">the side elevation and the plan, as built</span>
+      </div>
+      <div id="pane-3d" hidden>
+        <h2 class="fig-title">The resultant, in three dimensions <span>drag to orbit</span></h2>
+        <div id="scene3d"></div>
+        <p class="sc-readout" id="scene3d-readout"></p>
+        <p class="caption">
+          The side elevation carries x and z; the plan carries x and y. Between
+          them they cover all three axes but never at once, and in a
+          <strong>combined maneuver</strong> — braking while turning — the force
+          into the driver has all three components simultaneously. So the same
+          vector is drawn three times here from one origin at one scale: whole,
+          then with the lateral axis dropped (all the side elevation can hold),
+          then with the vertical dropped (all the plan can hold). The dashed
+          arrows are visibly shorter and point somewhere else; the angle on each
+          is how far the force leans out of that drawing's plane. That is what
+          the &otimes; in the side view has been admitting since M1, measured.
+          There is no body in this view: a figure was built, and cut, because at
+          every camera angle it read as a zigzag rather than a driver and drew
+          the eye away from the one thing the view is for.
+        </p>
+      </div>
+      <div class="figures">
+        <div class="fig-col">
+          <h2 class="fig-title">Side elevation <span>vertical and fore-aft</span></h2>
+          <div id="figure"></div>
+        </div>
+        <div class="fig-col fig-col-plan">
+          <h2 class="fig-title">Plan <span>lateral, and tyre load</span></h2>
+          <div id="figure-plan"></div>
+        </div>
+      </div>
+      <p class="legend">
+        <span class="key act">car → driver</span>
+        <span class="key react">driver → car</span>
+        <span class="key grav">weight</span>
+        <span class="key sym">● centre of mass</span>
+        <span class="key sym">⊗ acts into the page</span>
+        <span class="scale">arrow length ∝ √force</span>
+      </p>
+      <p class="caption">
+        Set what a driver does and everything follows from one solve. The side
+        elevation carries what a profile can show honestly; the plan view
+        carries lateral load, which in profile would only point into the page.
+        Each contact's number is its share of the total, picked by
+        <strong>minimum stored elastic energy subject to what that contact can
+        physically do</strong> — foam cannot pull, webbing cannot push, and a
+        driver can only brace so hard. Ask for more grip than the surface has
+        and both drawings keep showing the clamped state the tyres can actually
+        deliver, and say so rather than extrapolating.
+      </p>
+      <p class="caption">
+        With <strong>body lag</strong> on, the occupant follows the cabin as a
+        <strong>mass on a spring</strong> — 2.0&nbsp;Hz, damping 0.45 — so
+        mid-maneuver the two drawings deliberately disagree: the tyre loads in
+        plan have already moved while the body in elevation is still arriving.
+        Then it arrives and keeps going. At the end of a hard stop the car is
+        stationary and the occupant is still rocking, which is the part you
+        actually feel and the part the model could not show until M8. The
+        <em>1st order</em> button runs the older response for comparison: it
+        reaches 90% in 0.58&nbsp;s instead of 0.16&nbsp;s and, being
+        first-order, cannot overshoot at all. The gap is the readout marked
+        <em>body vs cabin</em>, and it says whether the occupant is still
+        arriving or has gone past. It closes to nothing whenever the inputs
+        hold still, so every settled number is the same with the lag on or
+        off, either model — asserted by a test against both.
+      </p>
+      <section id="vib-block">
+        <h2 class="fig-title">Vibration <span>a different quantity, in different units</span></h2>
+        <div id="spectrum"></div>
+        <p class="caption">
+          Everything above is force in newtons at one instant. This is
+          <strong>whole-body vibration</strong>: a weighted RMS acceleration in
+          m/s² spread over frequency, evaluated per ISO 2631-1. The two are
+          deliberately not combined — a comfort index averaged into a force
+          arrow would satisfy neither. They share the speed and the road, and
+          nothing else. The <em>weighted</em> trace is what the seated body is
+          sensitive to; the gap between it and the raw trace is the human
+          weighting doing its work, discarding energy the seat really does
+          deliver but the body barely registers.
+        </p>
+      </section>
+    </section>
+
+    <aside id="panel">
+      <section>
+        <h2>State</h2>
+        <div id="state-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Ride <span class="count">ISO 2631-1</span></h2>
+        <div id="vib-rows" class="rows"></div>
+        <div id="vib-bands"></div>
+      </section>
+
+      <section>
+        <h2>Contacts <span class="count">12</span></h2>
+        <div id="contact-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Selected</h2>
+        <div id="detail"></div>
+      </section>
+
+      <section>
+        <h2>Body segments <span class="count">14</span></h2>
+        <p class="muted">
+          Force each segment needs just to be held up, from equation 5. A hand
+          weighs little; a trunk is half of you.
+        </p>
+        <div id="segment-rows" class="rows"></div>
+      </section>
+
+      <section>
+        <h2>Numbers you should not quote yet</h2>
+        <p class="muted">
+          The force split leans on these first. Full list in
+          <strong>Assumptions</strong>, top right.
+        </p>
+        <div id="caveats"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="js/model/constants.js"></script>
+  <script src="js/model/touchpoints.js"></script>
+  <script src="js/model/vehicle.js"></script>
+  <script src="js/model/occupant.js"></script>
+  <script src="js/model/contacts.js"></script>
+  <script src="js/model/scenarios.js"></script>
+  <script src="js/model/vibration.js"></script>
+  <script src="js/model/anatomy.js"></script>
+  <script src="js/view2d/vectors.js"></script>
+  <script src="js/view2d/side.js"></script>
+  <script src="js/view2d/plan.js"></script>
+  <script src="js/view2d/spectrum.js"></script>
+  <script src="js/view3d/scene.js"></script>
+  <script src="js/ui/assumptions.js"></script>
+  <script src="js/ui/controls.js"></script>
+  <script src="js/ui/transport.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

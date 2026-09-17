@@ -1,0 +1,577 @@
+/* Driver Load Path — M1.
+   Follows the house palette set by apps/gridprobe so the two read as one repo.
+   The one addition is a meaning-bearing pair: --act is the car acting on the
+   driver, --react is the driver acting on the car. Those two colours are never
+   used for anything else. */
+:root {
+  --bg: #0d1117;
+  --bg-soft: #151b24;
+  --bg-sunk: #10161e;
+  --line: #232c38;
+  --line-strong: #3a4655;
+  --fg: #e6edf3;
+  --fg-dim: #8b98a9;
+  --act: #f2716b;          /* car → driver */
+  --react: #58a6ff;        /* driver → car */
+  --warn: #d9a441;
+  /* The vibration channel. A third meaning-bearing hue, deliberately not --act
+     or --react: those two encode direction of action on a force, and vibration
+     has no direction and is not a force. Validated against this surface for the
+     lightness band, chroma floor, CVD separation and contrast. */
+  --vib: #8f6ee0;
+  --vib-soft: #6d55ab;
+  --ok: #57ab5a;
+  --toolbar-h: 46px;
+  --panel-w: 380px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+body { display: flex; flex-direction: column; overflow: hidden; }
+
+#toolbar {
+  display: flex; align-items: center; gap: 10px;
+  height: var(--toolbar-h); padding: 0 14px; flex: none;
+  background: var(--bg-soft); border-bottom: 1px solid var(--line);
+  user-select: none;
+}
+.brand { font-weight: 600; letter-spacing: .02em; }
+.milestone {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--react); border: 1px solid var(--react);
+  border-radius: 3px; padding: 2px 7px;
+}
+.spacer { flex: 1; }
+.readout { color: var(--fg-dim); font-size: 12px; }
+
+#stage { flex: 1; display: flex; min-height: 0; }
+
+#figure-wrap {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  padding: 18px 22px 20px; gap: 14px; overflow-y: auto;
+}
+#figure { flex: none; }
+.side-view { display: block; width: 100%; height: auto; max-height: 62vh; }
+
+.legend {
+  display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0;
+  font-size: 11.5px; color: var(--fg-dim);
+  border-top: 1px solid var(--line); padding-top: 11px;
+}
+.key { display: inline-flex; align-items: center; gap: 7px; }
+.key::before {
+  content: ''; width: 17px; height: 3px; background: currentColor; flex: none;
+}
+.key.act { color: var(--act); }
+.key.react { color: var(--react); }
+.key.grav { color: var(--fg-dim); }
+.key.sym::before { display: none; }
+.scale { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.caption {
+  margin: 0; max-width: 76ch; color: var(--fg-dim); font-size: 12.5px; line-height: 1.6;
+}
+.caption strong { color: var(--fg); font-weight: 600; }
+
+/* ---------- figure internals ---------- */
+.contact-label { font-size: 12px; fill: var(--fg-dim); }
+.contact-n { fill: var(--act); font-weight: 600; }
+.contact .dot { fill: var(--line-strong); }
+.contact.is-active .dot { fill: var(--act); }
+.contact.is-active .contact-label { fill: var(--fg); }
+.contact { cursor: pointer; }
+.contact:focus { outline: none; }
+/* Selection must not resize the marker: radius already encodes load, so
+   forcing r here made the most-loaded contact shrink when you clicked it.
+   Ring it instead and leave the size alone. */
+.contact.is-selected .dot { fill: var(--react); stroke: var(--react); stroke-width: 3; stroke-opacity: .35; }
+.contact.is-selected .contact-label { fill: var(--react); font-weight: 600; }
+.contact.is-selected .leader path { stroke: var(--react); }
+.contact:focus-visible .contact-label { text-decoration: underline; }
+.vec-label { font-size: 11.5px; font-weight: 600; }
+.note-label { font-size: 10.5px; }
+
+/* ---------- panel ---------- */
+#panel {
+  width: var(--panel-w); flex: none; overflow-y: auto;
+  background: var(--bg-soft); border-left: 1px solid var(--line);
+  padding: 0 0 28px;
+}
+#panel section { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+#panel h2 {
+  margin: 0 0 10px; font-size: 11px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--fg-dim); font-weight: 600;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.count { color: var(--line-strong); font-size: 11px; letter-spacing: 0; }
+.muted { color: var(--fg-dim); font-size: 12px; margin: 0 0 10px; line-height: 1.55; }
+
+.rows { display: flex; flex-direction: column; gap: 1px; }
+.row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 6px; border-radius: 3px; font-size: 12px;
+}
+.row .k { flex: 1; min-width: 0; }
+.row .v {
+  font-variant-numeric: tabular-nums; color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+}
+.row .note { color: var(--line-strong); font-size: 11px; flex: none; max-width: 13ch; }
+
+.row.seg .k { flex: 0 0 9.5em; color: var(--fg-dim); }
+.row.seg .v { flex: 0 0 4.6em; text-align: right; }
+.bar { flex: 1; height: 4px; background: var(--bg-sunk); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--act); opacity: .75; }
+
+.contact-row { cursor: pointer; }
+.contact-row:hover, .contact-row.sel { background: var(--bg-sunk); }
+.contact-row.sel { box-shadow: inset 2px 0 0 var(--react); }
+.contact-row:focus-visible { outline: 1px solid var(--react); outline-offset: -1px; }
+.contact-row .n {
+  font-family: ui-monospace, monospace; font-size: 11px;
+  color: var(--act); flex: none; width: 1.8em;
+}
+.contact-row.off .n { color: var(--line-strong); }
+.contact-row.off .k { color: var(--fg-dim); }
+.contact-row .state {
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ok); flex: none; width: 4.4em; text-align: right;
+}
+.contact-row.off .state { color: var(--line-strong); }
+
+.pill {
+  font-size: 10px; letter-spacing: .05em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 2px; border: 1px solid var(--line-strong);
+  color: var(--fg-dim); flex: none;
+}
+.pill.compression { border-color: #3f5a44; color: #8fbf96; }
+.pill.tension { border-color: #3d4f6b; color: #8fb4e0; }
+.pill.bidirectional { border-color: #5c4a34; color: #d0a877; }
+.pill.corroborated { border-color: #3d4f6b; color: #8fb4e0; }
+.pill.placeholder { border-color: #5c4a34; color: var(--warn); }
+
+/* ---------- detail ---------- */
+#detail h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+#detail h3 .n { color: var(--act); font-family: ui-monospace, monospace; font-size: 12px; }
+#detail .anat { margin: 0 0 11px; color: var(--fg-dim); font-size: 12px; }
+.pair { display: flex; flex-direction: column; gap: 7px; }
+.half {
+  border-left: 2px solid; padding: 6px 0 6px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.half.act { border-color: var(--act); }
+.half.react { border-color: var(--react); }
+.half .dir {
+  font-size: 10px; letter-spacing: .07em; text-transform: uppercase; font-weight: 600;
+}
+.half.act .dir { color: var(--act); }
+.half.react .dir { color: var(--react); }
+.half .what { font-size: 12px; color: var(--fg); line-height: 1.45; }
+.meta {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 11px;
+  font-size: 11px; color: var(--fg-dim);
+}
+
+/* ---------- caveats ---------- */
+.caveat {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.caveat:last-child { border-bottom: none; }
+.caveat .pill { align-self: flex-start; }
+.caveat .ck {
+  font-family: ui-monospace, monospace; font-size: 11px; color: var(--fg);
+}
+.caveat .cv { font-size: 11.5px; color: var(--fg-dim); line-height: 1.5; }
+
+/* Below 900px the two-column flex layout collapses the figure to nothing,
+   because the panel's content claims the whole column. Drop out of flex
+   entirely rather than trying to referee it: the page becomes an ordinary
+   scrolling document, figure first, panel under it. */
+@media (max-width: 900px) {
+  html, body { height: auto; overflow: visible; }
+  body { display: block; }
+  #toolbar {
+    height: auto; min-height: var(--toolbar-h);
+    flex-wrap: wrap; padding: 8px 14px; row-gap: 4px;
+  }
+  .readout { flex-basis: 100%; }
+  .spacer { display: none; }
+  #stage { display: block; min-height: 0; }
+  #figure-wrap { padding: 16px 14px 18px; display: block; }
+  #figure { margin-bottom: 14px; }
+  #panel { width: auto; border-left: none; border-top: 1px solid var(--line); }
+  .side-view { max-height: none; }
+  .legend { margin-bottom: 12px; }
+  .row .note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- M2: force values, and the provenance drawer ---------- */
+.contact-force { fill: var(--act); font-weight: 600; }
+.contact.is-idle .contact-force { fill: var(--line-strong); }
+.contact.is-selected .contact-force { fill: var(--react); }
+
+.row.contact-row .v.force {
+  flex: 0 0 4.4em; text-align: right; font-size: 11.5px;
+}
+.row.contact-row.off .v.force { color: var(--line-strong); }
+.row.contact-row .bar { flex: 0 0 2.4em; }
+/* The longest label, "Brake / throttle pedal", wrapped to two lines and threw
+   that row out of alignment with the other eleven. */
+.row.contact-row { gap: 7px; }
+.row.contact-row .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.contact-row .pill { font-size: 9.5px; padding: 1px 5px; }
+.row.contact-row .bar i { background: var(--act); }
+
+.detail-force {
+  display: flex; align-items: baseline; gap: 9px; margin: 10px 0 4px;
+  padding: 8px 10px; background: var(--bg-sunk); border-left: 2px solid var(--act);
+}
+.detail-force.idle { border-left-color: var(--line-strong); }
+.detail-force .fv {
+  font-family: ui-monospace, monospace; font-size: 17px; font-weight: 600;
+  color: var(--act); font-variant-numeric: tabular-nums;
+}
+.detail-force.idle .fv { color: var(--fg-dim); font-size: 13px; }
+.detail-force .fl { font-size: 11px; color: var(--fg-dim); line-height: 1.4; }
+
+button.ghost {
+  background: transparent; color: var(--fg-dim);
+  border: 1px solid var(--line-strong); border-radius: 3px;
+  padding: 4px 10px; font: inherit; font-size: 11.5px; cursor: pointer;
+}
+button.ghost:hover { color: var(--fg); border-color: var(--fg-dim); }
+button.ghost:focus-visible { outline: 2px solid var(--react); outline-offset: 1px; }
+button.ghost[aria-expanded="true"] { color: var(--react); border-color: var(--react); }
+
+.drawer {
+  position: fixed; top: var(--toolbar-h); right: 0; bottom: 0; width: min(520px, 100%);
+  background: var(--bg-soft); border-left: 1px solid var(--line-strong);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, .45);
+  overflow-y: auto; z-index: 20; padding: 0 0 40px;
+}
+.drawer[hidden] { display: none; }
+.drawer-head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; background: var(--bg-soft); border-bottom: 1px solid var(--line);
+}
+.drawer-head h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.drawer-close {
+  background: none; border: none; color: var(--fg-dim); font-size: 22px;
+  line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.drawer-close:hover { color: var(--fg); }
+.drawer-close:focus-visible { outline: 2px solid var(--react); outline-offset: 2px; }
+.drawer-lede { margin: 0; padding: 14px 18px; color: var(--fg-dim); font-size: 12.5px; line-height: 1.55; }
+
+.prov-group { padding: 6px 18px 14px; border-top: 1px solid var(--line); }
+.prov-group h3 { margin: 12px 0 4px; display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.grp-count { color: var(--line-strong); font-size: 11px; font-weight: 400; }
+.grp-blurb { margin: 0 0 10px; color: var(--fg-dim); font-size: 11.5px; line-height: 1.5; }
+.prov { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.prov:last-child { border-bottom: none; }
+.prov-key { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--fg); }
+.prov-val {
+  font-family: ui-monospace, monospace; font-size: 11px; color: var(--react);
+  margin-top: 2px; font-variant-numeric: tabular-nums;
+}
+.prov-src { font-size: 12px; color: var(--fg-dim); line-height: 1.5; margin-top: 4px; }
+.prov-caveat {
+  font-size: 11.5px; color: var(--warn); line-height: 1.5; margin-top: 6px;
+  border-left: 2px solid var(--warn); padding-left: 9px;
+}
+.drawer-foot { padding: 14px 18px; border-top: 1px solid var(--line-strong); }
+.drawer-foot p { margin: 0; color: var(--fg-dim); font-size: 11.5px; line-height: 1.55; }
+
+@media (max-width: 900px) {
+  .drawer { top: 0; width: 100%; border-left: none; }
+  body.drawer-open { overflow: hidden; }
+}
+
+/* ---------- M3: the input strip, two views, the limit banner ---------- */
+#controls { flex: none; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+.ctl-strip {
+  display: flex; align-items: flex-end; gap: 18px;
+  padding: 10px 14px 12px; flex-wrap: wrap;
+}
+.ctl { display: flex; flex-direction: column; gap: 5px; min-width: 118px; }
+.ctl-label {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--fg-dim); font-weight: 600;
+}
+.ctl-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  color: var(--fg); letter-spacing: 0; text-transform: none; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ctl input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 3px;
+  background: var(--line-strong); border-radius: 2px; outline: none; margin: 6px 0;
+}
+.ctl input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--act); cursor: pointer; border: 2px solid var(--bg-soft);
+}
+.ctl input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--act);
+  cursor: pointer; border: 2px solid var(--bg-soft);
+}
+.ctl input[type="range"]:focus-visible { outline: 2px solid var(--react); outline-offset: 4px; }
+
+.seg { display: flex; gap: 0; }
+.seg-btn {
+  background: transparent; color: var(--fg-dim); border: 1px solid var(--line-strong);
+  padding: 4px 9px; font: inherit; font-size: 11px; cursor: pointer; margin-left: -1px;
+}
+.seg-btn:first-child { border-radius: 3px 0 0 3px; margin-left: 0; }
+.seg-btn:last-child { border-radius: 0 3px 3px 0; }
+.seg-btn.on { color: var(--bg); background: var(--fg-dim); border-color: var(--fg-dim); }
+.seg-btn:focus-visible { outline: 2px solid var(--react); outline-offset: 1px; z-index: 1; }
+
+.ctl-gauge { min-width: 104px; align-items: center; }
+.gauge { width: 76px; height: 76px; display: block; }
+.gauge-limit { transition: stroke .15s; }
+.gauge.over .gauge-limit { stroke: var(--warn); }
+.gauge-tick { font-size: 8px; }
+.gauge-read {
+  font-family: ui-monospace, monospace; font-size: 10px; color: var(--fg-dim);
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.gauge-read.over { color: var(--warn); font-weight: 600; }
+.ctl-reset { align-self: center; }
+
+/* ---- M4 transport ---- */
+#transport { flex: none; background: var(--bg-sunk); border-bottom: 1px solid var(--line); }
+.transport {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 14px; flex-wrap: wrap;
+}
+.tp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.tp-chip {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg-dim);
+  border-radius: 3px; padding: 4px 10px; font-size: 11.5px; cursor: pointer;
+  font-family: inherit;
+}
+.tp-chip:hover { color: var(--fg); border-color: var(--fg-dim); }
+.tp-chip.on { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
+.tp-play {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg);
+  border-radius: 3px; width: 34px; height: 26px; cursor: pointer; font-size: 11px;
+  font-family: inherit; line-height: 1;
+}
+.tp-play:disabled { opacity: .35; cursor: default; }
+.tp-play:not(:disabled):hover { border-color: var(--fg-dim); }
+.transport.playing .tp-play { border-color: var(--act); color: var(--act); }
+.tp-scrub { flex: 1 1 200px; min-width: 140px; max-width: 620px; }
+.tp-scrub:disabled { opacity: .35; }
+.tp-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  color: var(--fg-dim); font-variant-numeric: tabular-nums; min-width: 10ch;
+}
+.transport.playing .tp-clock { color: var(--act); }
+.tp-lag {
+  display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+  color: var(--fg-dim); cursor: pointer; user-select: none;
+}
+.tp-lag input { margin: 0; accent-color: var(--act); }
+.tp-tau {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
+  color: var(--line-strong);
+}
+.tp-blurb {
+  margin: 0; padding: 0 14px 10px; max-width: 92ch;
+  font-size: 12px; color: var(--fg-dim); line-height: 1.55;
+}
+.tp-blurb[hidden] { display: none; }
+.row.transient .v { color: var(--act); }
+
+.limit-banner {
+  flex: none; margin: 0; padding: 8px 16px; font-size: 12px; line-height: 1.5;
+  background: rgba(217, 164, 65, .11); color: var(--warn);
+  border-bottom: 1px solid var(--line);
+}
+.limit-banner[hidden] { display: none; }
+
+/* [hidden] must come with the display rule. `.figures { display: flex }` beat
+   the UA stylesheet's [hidden]{display:none} — any author display wins — so the
+   view switch set the attribute, reported hidden:true when asked, and drew both
+   views anyway. It read as working on a desktop only because the 3D pane pushed
+   the 2D figures below the fold. Checking the PROPERTY is what hid it; a phone
+   screenshot is what found it. */
+.figures[hidden] { display: none; }
+.figures { display: flex; gap: 20px; align-items: flex-start; min-width: 0; }
+.fig-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fig-col:first-child { flex: 1 1 55%; }
+.fig-col-plan { flex: 1 1 45%; }
+.fig-title {
+  margin: 0; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--fg-dim); font-weight: 600; display: flex; gap: 8px; align-items: baseline;
+}
+.fig-title span { color: var(--line-strong); letter-spacing: 0; text-transform: none; font-weight: 400; }
+.plan-view { display: block; width: 100%; height: auto; max-height: 58vh; }
+.patch-label { font-size: 9.5px; font-variant-numeric: tabular-nums; }
+.plan-heading { font-size: 11px; }
+.plan-axis { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+
+.row.warn .v { color: var(--warn); font-weight: 600; }
+
+@media (max-width: 1180px) {
+  .figures { flex-direction: column; }
+  .fig-col, .fig-col-plan { flex: none; width: 100%; }
+  .plan-view { max-height: none; }
+}
+@media (max-width: 900px) {
+  .ctl-strip { gap: 12px; padding: 10px 14px; }
+  .transport { gap: 10px; padding: 8px 14px; }
+  .tp-scrub { flex-basis: 100%; }
+  .ctl { min-width: calc(50% - 8px); flex: 1 1 calc(50% - 8px); }
+  .ctl-gauge, .ctl-surface { flex-basis: 100%; }
+}
+
+.plan-lat-label { font-size: 9.5px; }
+
+
+/* ---- M5 vibration: spectrum chart and ride panel ---- */
+#vib-block { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
+#spectrum { margin-top: 10px; }
+.spectrum { display: block; width: 100%; height: auto; }
+.spec-region { fill: var(--vib); opacity: .07; }
+.spec-region-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px;
+  fill: var(--fg-dim); letter-spacing: .04em;
+}
+.spec-axis { stroke: var(--line-strong); stroke-width: 1; }
+.spec-region-rule { stroke: var(--vib-soft); stroke-width: 1; opacity: .55; }
+.spec-grid { stroke: var(--line); stroke-width: 1; }
+.spec-tick {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px;
+  fill: var(--fg-dim);
+}
+.spec-weighted { stroke: var(--vib); stroke-width: 2; stroke-linejoin: round; }
+.spec-fill { fill: var(--vib); opacity: .14; stroke: none; }
+.spec-raw {
+  stroke: var(--vib-soft); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .95;
+}
+.spec-peak { fill: var(--vib); stroke: var(--bg); stroke-width: 2; }
+.spec-label { font-size: 10.5px; fill: var(--fg-dim); }
+.spec-label.weighted { fill: var(--fg); }
+.spec-sub { font-size: 9.5px; fill: var(--line-strong); }
+.spec-region { }
+.spec-hair { stroke: var(--fg-dim); stroke-width: 1; stroke-dasharray: 2 3; }
+.spec-tip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+  fill: var(--fg);
+}
+.spec-hit { cursor: crosshair; }
+
+.vib-row .v { color: var(--vib); }
+.row.vib-total { border-top: 1px solid var(--line); }
+.row.vib-total .k, .row.vib-total .v { font-weight: 600; }
+.vib-verdict {
+  margin-top: 10px; padding: 9px 12px; border-radius: 3px;
+  border-left: 2px solid var(--ok); background: rgba(87,171,90,.08);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.vib-verdict.warn { border-left-color: var(--warn); background: rgba(217,164,65,.09); }
+.vib-verdict.bad  { border-left-color: var(--act); background: rgba(242,113,107,.09); }
+.vv-label { font-size: 12.5px; color: var(--fg); font-weight: 600; }
+.vib-verdict.warn .vv-label { color: var(--warn); }
+.vib-verdict.bad .vv-label { color: var(--act); }
+.vv-also { font-size: 11px; color: var(--fg-dim); }
+.vib-split { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.vb { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.vb-k { color: var(--fg-dim); flex: 1; }
+.vb-v {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  color: var(--vib); font-variant-numeric: tabular-nums; width: 4ch; text-align: right;
+}
+.vb .bar { flex: none; width: 66px; height: 4px; background: var(--bg-sunk); border-radius: 2px; }
+.vb .bar i { display: block; height: 100%; background: var(--vib); border-radius: 2px; }
+.ctl-road .seg-btn { min-width: 26px; padding-left: 7px; padding-right: 7px; }
+
+
+/* ---- M6: the 3D view, gated ---- */
+.view-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.vs-btn {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg-dim);
+  border-radius: 3px; padding: 4px 12px; font-size: 11.5px; cursor: pointer;
+  font-family: inherit;
+}
+.vs-btn:hover { color: var(--fg); border-color: var(--fg-dim); }
+.vs-btn.on { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
+.vs-note { font-size: 11.5px; color: var(--line-strong); margin-left: 4px; }
+#pane-3d[hidden] { display: none; }
+/* user-select off: orbiting is a drag, and a drag across the legend was
+   selecting the label text and leaving it highlighted behind the scene. */
+.scene3d { display: block; width: 100%; max-width: 940px; height: auto; cursor: grab;
+           -webkit-user-select: none; user-select: none; }
+.scene3d:active { cursor: grabbing; }
+.sc-grid { stroke: var(--line); stroke-width: 1; opacity: .5; }
+.sc-panel { fill: #1a222d; fill-opacity: .5; stroke: var(--line-strong); stroke-width: 1.3; }
+.sc-wheel { fill: none; stroke: #556579; stroke-width: 2.5; }
+.sc-bone { stroke: var(--fg-dim); stroke-width: 3; stroke-linecap: round; opacity: .85; }
+.sc-joint { fill: var(--fg-dim); }
+.sc-head { fill: var(--bg-soft); stroke: var(--fg-dim); stroke-width: 2.5; }
+.sc-contact { fill: var(--act); cursor: pointer; }
+.sc-contact.idle { fill: var(--line-strong); }
+.sc-contact.sel { fill: var(--act); }
+.sc-ring { fill: none; stroke: var(--act); stroke-width: 1.5; opacity: .8; }
+.sc-resultant { stroke: var(--act); stroke-width: 3; }
+.sc-com { fill: var(--fg); }
+.sc-resultant-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+  fill: var(--act); font-weight: 600;
+}
+.sc-resultant-sub { font-size: 10.5px; fill: var(--fg-dim); }
+
+/* The two projections are the SAME quantity one axis poorer, not a second
+   category, so they keep --act and separate by weight and dash — the same rule
+   the spectrum chart uses for its unweighted trace. Identity never rests on
+   colour alone here either: both are directly labelled. */
+.sc-proj { stroke: var(--act); stroke-width: 1.6; opacity: .62; stroke-dasharray: 6 4; }
+.sc-drop { stroke: var(--fg-dim); stroke-width: 1; opacity: .42; stroke-dasharray: 2 3; }
+.sc-proj-label { font-size: 10.5px; fill: var(--act); opacity: .85; }
+.sc-proj-label.dim { fill: var(--fg-dim); opacity: .9; }
+.sc-leader { stroke: var(--line-strong); stroke-width: 1; opacity: .55; }
+.sc-axis-note { font-size: 9.5px; fill: var(--line-strong); }
+
+/* M8. The body-response model switch. Deliberately small and beside the lag
+   checkbox: it is a comparison control, not a headline setting. */
+.tp-order { display: inline-flex; gap: 0; margin-left: 10px; }
+.tp-order-btn {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--fg-dim);
+  padding: 2px 8px; font-size: 10.5px; cursor: pointer; font-family: inherit;
+}
+.tp-order-btn:first-child { border-radius: 3px 0 0 3px; }
+.tp-order-btn:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+.tp-order-btn:hover { color: var(--fg); }
+.tp-order-btn.on { background: var(--line-strong); color: var(--fg); font-weight: 600; }
+
+/* The scene's legend lives in SVG units, so it shrinks with the drawing: at
+   390px wide the 880-unit viewBox scales by 0.44 and 10.5px type renders at
+   under 5px. Below 760px the in-scene legend is dropped and the same three
+   facts are read from the HTML block under the figure, which is real text at
+   real size — and which is fed from the same render() return, so the two can
+   never disagree about a number. */
+.sc-readout { display: none; margin-top: 6px; font-size: 12px; color: var(--fg-dim); }
+.sc-readout b { color: var(--act); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sc-readout span { display: block; margin-top: 3px; }
+@media (max-width: 760px) {
+  .sc-legend { display: none; }
+  .sc-readout { display: block; }
+}
+.sc-axis { stroke: var(--line-strong); stroke-width: 1.5; }
+.sc-axis-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+  fill: var(--fg-dim);
+}
